@@ -1,4 +1,5 @@
-import os
+import struct
+
 from image import Image
 from pixel import Pixel
 import os
@@ -9,12 +10,18 @@ class Encoder:
         self.__image = image
 
     def save_to(self, path: str) -> None:
-        with open(path + "file.ulbmp", 'wb') as f:
-            f.write('\x55\x4c\x42\x4d\x50\x01\x0c\x00\x02\x00\x02\x00'.encode())
-            f.write('\x00\x00\x00'.encode())
-            f.write('\x0D\xFF\xFF\xFF'.encode())
-            f.write('\x00\x00\x00'.encode())
-            f.write('\xFF\xFF\xff'.encode())
+        with open(path, 'wb') as f:
+            version1 = b'\x55\x4c\x42\x4d\x50\x01'
+            lengthHeader = b'\x0c\x00'
+            width = self.__image.width.to_bytes(length=2, byteorder='little', signed=False)
+            height = self.__image.height.to_bytes(length=2, byteorder='little', signed=False)
+            f.write(version1)
+            f.write(lengthHeader)
+            f.write(width + height)
+            for r, g, b in self.__image:
+                f.write(r.to_bytes(length=1, byteorder='big'))
+                f.write(g.to_bytes(length=1, byteorder='big'))
+                f.write(b.to_bytes(length=1, byteorder='big'))
 
 
 class Decoder:
@@ -24,8 +31,9 @@ class Decoder:
 
 
 if __name__ == '__main__':
-    p = Pixel(34, 56, 21)
-    pp = Pixel(54, 23, 76)
-    image = Image(2, 2, [p, pp, p, pp])
+    BLACK = Pixel(0, 0, 0)
+    WHITE = Pixel(0xFF, 0xFF, 0xFF)
+    image = Image(2, 2, [BLACK, WHITE, BLACK, WHITE])
     encoder = Encoder(image)
-    encoder.save_to(os.getcwd()+'/00589811')
+    print(os.getcwd())
+    encoder.save_to(os.getcwd()+'/file.ulbmp')

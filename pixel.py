@@ -17,12 +17,12 @@ def is_valid_color(r: int, g: int, b: int):
 class Pixel:
     def __init__(self, r: int, g: int, b: int):
         is_valid_color(r, g, b)
-        self.__red = hex(r)
-        self.__green = hex(g)
-        self.__blue = hex(b)
+        self.__red = r
+        self.__green = g
+        self.__blue = b
 
     def __str__(self) -> str:
-        return f'{int(self.__red, 16)} {int(self.__green, 16)} {int(self.__blue, 16)}'
+        return f'{self.__red, 16} {self.__green, 16} {self.__blue, 16}'
 
     def __eq__(self, other) -> bool:
         return self.__red == other.__red and self.__green == other.__green and self.__blue == other.__blue
@@ -36,6 +36,6 @@ class Pixel:
 
 
 if __name__ == "__main__":
-    pixel = Pixel(0x00, 255, 56)
+    pixel = Pixel(0x02, 255, 56)
     pix = Pixel(45, 32, 55)
-    print(pixel == pix)
+    print(pixel.color)
