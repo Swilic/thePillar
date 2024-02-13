@@ -13,7 +13,6 @@ def verify_entries(width: int, height: int, pixels: list[Pixel]) -> int:
 class Image:
     def __init__(self, width: int, height: int, pixels: list[Pixel]) -> None:
         verify_entries(width, height, pixels)
-
         self.__width = width
         self.__height = height
         self.__pixels = pixels
@@ -49,6 +48,18 @@ class Image:
         for i in range(len(self.__pixels)):
             yield self.__pixels[i].color
 
+    @property
+    def pixels(self) -> list:
+        return self.__pixels
+
+    @property
+    def width(self) -> int:
+        return self.__width
+
+    @property
+    def height(self) -> int:
+        return self.__height
+
     def is_valid_pos(self, pos: tuple) -> bool:
         if pos[0] + pos[1] * self.__width < self.__count:
             if pos[0] < self.__width and pos[1] < self.__height:
@@ -62,3 +73,4 @@ if __name__ == '__main__':
     image = Image(2, 1, [pixel, pixel2])
     # image1 = Image(10, 10, [pixel2])
     print(image[0, 0])
+    print(image.width, image.height)
