@@ -38,7 +38,7 @@ def verify_header(header: bytes) -> bool:
 class Decoder:
 
     @staticmethod
-    def load_from(path: str) -> object:
+    def load_from(path: str) -> 'Image':
         with open(path, 'rb') as f:
             try:
                 header = f.read(12)
