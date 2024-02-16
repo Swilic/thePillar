@@ -1,23 +1,25 @@
 import sys
 import os
-from image import Image
-from pixel import Pixel
 from encoding import Encoder, Decoder
 from PySide6 import QtCore, QtWidgets, QtGui
-import random
 
 
 class MyWidget(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
+
         self.label = QtWidgets.QLabel()
         self.layout = QtWidgets.QVBoxLayout()
-        self.setWindowTitle('Projet informatique avec 17 pages de consignes')
+        self.setWindowTitle('Projet informatique avec 17(dix-sept)pages de consignes')
         self.is_image = False
         self.load_button = QtWidgets.QPushButton('Load')
         self.save_button = QtWidgets.QPushButton('Save')
 
         self.init_UI()
+
+    @staticmethod
+    def Qapp() -> QtWidgets.QApplication:
+        return QtWidgets.QApplication([])
 
     def init_UI(self):
         self.load_button.clicked.connect(self.load)
