@@ -1,25 +1,53 @@
 from image import Image
 from pixel import Pixel
-import os
+
+ULBMP = b'\x55\x4c\x42\x4d\x50'
+
+
+def save_v1(f, img: 'Image') -> None:
+    header = ULBMP + b'\x01\x0c\x00'
+    width = img.width.to_bytes(length=2, byteorder='little', signed=False)
+    height = img.height.to_bytes(length=2, byteorder='little', signed=False)
+    f.write(header + width + height)
+    for r, g, b in img:
+        f.write(r.to_bytes(length=1, byteorder='big'))
+        f.write(g.to_bytes(length=1, byteorder='big'))
+        f.write(b.to_bytes(length=1, byteorder='big'))
+
+
+def save_v2(f, img: 'Image') -> None:
+    header = ULBMP + b'\x02\x0c\x00'
+    width = img.width.to_bytes(length=2, byteorder='little', signed=False)
+    height = img.height.to_bytes(length=2, byteorder='little', signed=False)
+    f.write(header + width + height)
+    count = 1
+    for i in range(1, len(img)):
+        if img[i] == img[i-1]:
+            count += 1
+        else:
+            f.write(count.to_bytes(length=1, byteorder='little', signed=False))
+            [f.write(j.to_bytes(length=1, byteorder='little', signed=False)) for j in img[i-1].color]
+            count = 1
+    f.write(count.to_bytes(length=1, byteorder='little', signed=False))
+    [f.write(j.to_bytes(length=1, byteorder='little', signed=False)) for j in img[i - 1].color]
 
 
 class Encoder:
     def __init__(self, img: 'Image'):
         self.__image = img
 
-    def save_to(self, path: str) -> None:
+    @property
+    def image(self) -> 'Image':
+        return self.__image
+
+    def save_to(self, path: str, v=1) -> None:
+        case = {
+            1: save_v1,
+            2: save_v2,
+        }
         with open(path, 'wb') as f:
-            version1 = b'\x55\x4c\x42\x4d\x50\x01'
-            length_header = b'\x0c\x00'
-            width = self.__image.width.to_bytes(length=2, byteorder='little', signed=False)
-            height = self.__image.height.to_bytes(length=2, byteorder='little', signed=False)
-            f.write(version1)
-            f.write(length_header)
-            f.write(width + height)
-            for r, g, b in self.__image:
-                f.write(r.to_bytes(length=1, byteorder='big'))
-                f.write(g.to_bytes(length=1, byteorder='big'))
-                f.write(b.to_bytes(length=1, byteorder='big'))
+            if 1 <= v <= 2:
+                case[v](f, self.image)
 
 
 def verify_header(header: bytes) -> bool:
@@ -27,7 +55,7 @@ def verify_header(header: bytes) -> bool:
         if len(header) != 12:
             raise Exception('Header length error')
         ulbmp = header[:5]
-        if ulbmp != 'ULBMP'.encode():
+        if ulbmp != ULBMP:
             raise Exception('Header ULBMP is not valid')
     except Exception as e:
         raise Exception(e)
@@ -85,4 +113,5 @@ if __name__ == '__main__':
     BLACK = Pixel(0, 0, 0)
     WHITE = Pixel(0xFF, 0xFF, 0xFF)
     image = Image(2, 2, [BLACK, WHITE, BLACK, WHITE])
-    x = Decoder.load_from(os.getcwd() + '/file.ulbmp')
+    x = Decoder.load_from('./file.ulbmp')
+    Encoder(x).save_to('file.ulbmp', 2)
