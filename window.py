@@ -7,14 +7,15 @@ from PySide6 import QtCore, QtWidgets, QtGui
 class MyWidget(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
+        self.setWindowTitle('Projet informatique avec 17(dix-sept)pages de consignes')
+        self.is_image = False
+        self.image = None
+        self.Qimage = QtGui.QImage()
 
         self.label = QtWidgets.QLabel()
         self.layout = QtWidgets.QVBoxLayout()
-        self.setWindowTitle('Projet informatique avec 17(dix-sept)pages de consignes')
-        self.is_image = False
         self.load_button = QtWidgets.QPushButton('Load')
         self.save_button = QtWidgets.QPushButton('Save')
-
         self.init_UI()
 
     @staticmethod
@@ -24,6 +25,7 @@ class MyWidget(QtWidgets.QWidget):
     def init_UI(self):
         self.load_button.clicked.connect(self.load)
         self.save_button.setEnabled(self.is_image)
+        self.save_button.clicked.connect(self.save)
 
         but_box = QtWidgets.QHBoxLayout()
         but_box.addStretch(1)
@@ -38,28 +40,41 @@ class MyWidget(QtWidgets.QWidget):
         self.setLayout(vbox)
 
         self.show()
-    @QtCore.Slot()
-    def load(self):
-        photo = QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
-        try:
-            photo = Decoder.load_from(photo)
-        except Exception as e:
-            QtWidgets.QErrorMessage(self).showMessage(str(e))
-        self.is_image = True
-        self.image = QtGui.QImage(photo.width, photo.height, QtGui.QImage.Format_RGB32)
-        for i in range(photo.width):
-            for j in range(photo.height):
-                r, g, b = photo[i, j].color
+        self.set_Pixmap()
 
-                value = QtGui.qRgb(r, g, b)
-                self.image.setPixel(i, j, value)
-
-        pix = QtGui.QPixmap(self.image)
+    def set_Pixmap(self, ):
+        pix = QtGui.QPixmap(self.Qimage)
         self.label.setPixmap(pix)
         self.label.setMargin(10)
         self.label.setAlignment(QtCore.Qt.AlignCenter)
         self.save_button.setEnabled(self.is_image)
         self.layout.addWidget(self.label)
+
+    @QtCore.Slot()
+    def load(self):  # Comment faire si le gars quitte la fenetre, pour arreter la fonction sans break
+        image = QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
+        try:
+            self.image = Decoder.load_from(image)
+        except Exception as e:
+            QtWidgets.QErrorMessage(self).showMessage(str(e))
+
+        self.is_image = True
+        self.Qimage = QtGui.QImage(self.image.width, self.image.height, QtGui.QImage.Format_RGB32)
+        for i in range(self.image.width):
+            for j in range(self.image.height):
+                r, g, b = self.image[i, j].color
+
+                value = QtGui.qRgb(r, g, b)
+                self.Qimage.setPixel(i, j, value)
+        self.set_Pixmap()
+
+    @QtCore.Slot()
+    def save(self):
+        version = QtWidgets.QInputDialog.getInt(self, 'Version', 'Enter the version of the file', 1, 1, 2)[0]
+        choice = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
+
+        if choice:
+            Encoder(self.image).save_to(choice + '.ulbmp', version)
 
 
 if __name__ == "__main__":
