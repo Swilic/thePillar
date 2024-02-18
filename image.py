@@ -18,19 +18,23 @@ class Image:
         self.__pixels = pixels
         self.__count = len(pixels)
 
-    def __getitem__(self, pos: tuple) -> object:
-        if not self.is_valid_pos(pos):
-            raise IndexError
-        return self.__pixels[pos[0] + pos[1] * self.__width]
-
-    def __setitem__(self, pos: tuple, pixel: Pixel):
+    def __getitem__(self, pos: [tuple, int]) -> object:  # Comment faire le double type de parametre ?
         if not self.is_valid_pos(pos):
             raise IndexError
 
-        self.__pixels[pos[1] * self.__height + pos[0]] = pixel
+        if isinstance(pos, int):
+            return self.pixels[pos]
+        elif isinstance(pos, tuple):
+            return self.pixels[pos[0] + pos[1] * self.width]
+
+    def __setitem__(self, pos: tuple, pix: Pixel):
+        if not self.is_valid_pos(pos):
+            raise IndexError
+
+        self.pixels[pos[1] * self.height + pos[0]] = pix
 
     def __str__(self):
-        return f'width: {self.__width}, height: {self.__height}. pixels: {self.__pixels}'
+        return f'width: {self.width}, height: {self.height}. pixels: {self.pixels}'
 
     def __len__(self):
         return self.__count
@@ -39,14 +43,14 @@ class Image:
         if not isinstance(other, Image) and len(other) != self.__count:
             return False
 
-        for i in range(len(self.__pixels)):
-            if self.__pixels[i].color != other.__pixels[i].color:
+        for i in range(len(self.pixels)):
+            if self.pixels[i].color != other.pixels[i].color:
                 return False
         return True
 
     def __iter__(self):
-        for i in range(len(self.__pixels)):
-            yield self.__pixels[i].color
+        for i in range(len(self.pixels)):
+            yield self.pixels[i].color
 
     @property
     def pixels(self) -> list:
@@ -60,10 +64,14 @@ class Image:
     def height(self) -> int:
         return self.__height
 
-    def is_valid_pos(self, pos: tuple) -> bool:
-        if pos[0] + pos[1] * self.__width < self.__count:
-            if pos[0] < self.__width and pos[1] < self.__height:
-                return True
+    def is_valid_pos(self, pos: [tuple, int]) -> bool:
+        if isinstance(pos, int) and pos < len(self):
+            return True
+        elif isinstance(pos, tuple):
+            if pos[0] + pos[1] * self.width < len(self):
+                if pos[0] < self.width and pos[1] < self.height:
+                    return True
+
         return False
 
 
