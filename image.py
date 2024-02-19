@@ -11,14 +11,14 @@ def verify_entries(width: int, height: int, pixels: list[Pixel]) -> int:
 
 
 class Image:
-    def __init__(self, width: int, height: int, pixels: list[Pixel]) -> None:
+    def __init__(self, width: int, height: int, pixels: list['Pixel']) -> None:
         verify_entries(width, height, pixels)
         self.__width = width
         self.__height = height
         self.__pixels = pixels
         self.__count = len(pixels)
 
-    def __getitem__(self, pos: [tuple, int]) -> object:  # Comment faire le double type de parametre ?
+    def __getitem__(self, pos: [tuple, int]) -> 'Pixel':  # Comment faire le double type de parametre ? surcharge
         if not self.is_valid_pos(pos):
             raise IndexError
 
@@ -27,7 +27,7 @@ class Image:
         elif isinstance(pos, tuple):
             return self.pixels[pos[0] + pos[1] * self.width]
 
-    def __setitem__(self, pos: tuple, pix: Pixel):
+    def __setitem__(self, pos: tuple, pix: 'Pixel'):
         if not self.is_valid_pos(pos):
             raise IndexError
 
