@@ -17,7 +17,7 @@ def save_v1(f, img: 'Image') -> None:
 
 def save_v2(f, img: 'Image') -> None:
     def write(file, c: int, pix: 'Pixel'):
-        print(c)
+        c = 1 if c == 0 else c
         file.write(c.to_bytes(length=1, byteorder='big', signed=False))
         for i in range(3):
             file.write(pix.color[i].to_bytes(length=1, byteorder='big', signed=False))
