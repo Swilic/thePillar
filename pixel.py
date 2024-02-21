@@ -34,7 +34,7 @@ class Pixel:
     def color(self):
         return self.__red, self.__green, self.__blue
 
-    def __copy__(self):
+    def copy(self):
         return Pixel(self.color[0], self.color[1], self.color[2])
 
 

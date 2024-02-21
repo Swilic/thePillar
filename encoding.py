@@ -115,14 +115,25 @@ def load_v2(file_list) -> list['Pixel']:
 
 def load_v3(file_list, **k) -> list['Pixel']:
     dic, byts = get_header_info_v3(file_list, k['lh'])
-    for i in range(len(byts) + len(dic), len(file_list)): # comprendre comment faire et faire HAHAhaahahaHahaHAAHAAHAAHAH j'suis trop drôle le soir moi. Vraiment je m'aime de trop. Imagine, non mais imagine quand même. xoxo
-        print(file_list[i].to_bytes(length=1, byteorder='big', signed=False))
+    print(byts[0].color, byts[1].color, byts[2].color) # à supprimer
+    number_decal = 2**dic['depth'] - 1
+    pixel_list = []
+    for i in range(len(byts) + len(dic), len(file_list)):
+        counter = 8 - dic['depth']
+
+        pix_file = file_list[i]
+        for j in range(8 // counter):
+            index = (pix_file & (number_decal << counter)) >> counter # Le décalage est mauvais
+            counter -= dic['depth']
+            pixel_list.append(byts[index - 1])
+
+    return pixel_list
 
 
 def get_header_info_v3(f, length: int) -> Tuple[dict, list['Pixel']]:
-    dic = {'depth': f[0], 'rle': f[1]}
+    dic = {'depth': int(f[0]), 'rle': bool(f[1])}
     list_h_pixel = []
-    for i in range(2, length, 3):
+    for i in range(2, length - 14, 3):
         r = f[i]
         g = f[i+1]
         b = f[i+2]
@@ -169,5 +180,9 @@ if __name__ == '__main__':
     WHITE = Pixel(0xFF, 0xFF, 0xFF)
     image = Image(1, 1, [BLACK])
     # x = Decoder.load_from('./imgs/checkers2.ulbmp')
-    x = Decoder.load_from('./imgs/checkers3_no_rle.ulbmp')
+    with open('./file.ulbmp', 'wb') as f:
+        f.write(bytes.fromhex('554c424d50031700030001000200ff000000ff000000ff84'))
+
+    x = Decoder.load_from('./file.ulbmp')
+    print(x[2, 0].color)
     # Encoder(x, 3, depth=1, rle=False).save_to('file.ulbmp')
