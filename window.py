@@ -52,21 +52,24 @@ class MyWidget(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def load(self):  # Comment faire si le gars quitte la fenetre, pour arreter la fonction sans break
-        image = QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
+        image_path = QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
         try:
-            self.image = Decoder.load_from(image)
+            self.image = Decoder.load_from(image_path)
         except Exception as e:
             QtWidgets.QErrorMessage(self).showMessage(str(e))
 
-        self.is_image = True
-        self.Qimage = QtGui.QImage(self.image.width, self.image.height, QtGui.QImage.Format_RGB32)
-        for i in range(self.image.width):
-            for j in range(self.image.height):
-                r, g, b = self.image[i, j].color
+        self.set_Qimage(self.image)
+        self.set_Pixmap()
+
+    def set_Qimage(self, image: 'Image'):
+        self.Qimage = QtGui.QImage(image.width, image.height, QtGui.QImage.Format_RGB32)
+        for i in range(image.width):
+            for j in range(image.height):
+                r, g, b = image[i, j].color
 
                 value = QtGui.qRgb(r, g, b)
                 self.Qimage.setPixel(i, j, value)
-        self.set_Pixmap()
+        self.is_image = True
 
     @QtCore.Slot()
     def save(self):
@@ -74,7 +77,7 @@ class MyWidget(QtWidgets.QWidget):
         choice = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
 
         if choice:
-            Encoder(self.image).save_to(choice + '.ulbmp', version)
+            Encoder(self.image, version).save_to(choice + '.ulbmp')
 
 
 if __name__ == "__main__":

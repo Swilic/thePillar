@@ -34,6 +34,9 @@ class Pixel:
     def color(self):
         return self.__red, self.__green, self.__blue
 
+    def __copy__(self):
+        return Pixel(self.color[0], self.color[1], self.color[2])
+
 
 if __name__ == "__main__":
     pixel = Pixel(0x02, 255, 56)
