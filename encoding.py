@@ -96,8 +96,7 @@ def verify_header(ulbmp: bytes) -> bool:
 
 
 def load_v1(file_list) -> list['Pixel']:
-
-    pixel_list = list()
+    pixel_list = []
     for i in range(0, len(file_list), 3):
         pixel_list.append(Pixel(file_list[i], file_list[i + 1], file_list[i + 2]))
 
@@ -114,23 +113,29 @@ def load_v2(file_list) -> list['Pixel']:
 
 
 def load_v3(file_list, **k) -> list['Pixel']:
-    dic, byts = get_header_info_v3(file_list, k['lh'])
-    print(byts[0].color, byts[1].color, byts[2].color) # à supprimer
-    number_decal = 2**dic['depth'] - 1
+    dic, byts, length = get_header_info_v3(file_list, k['lh'])
+
     pixel_list = []
-    for i in range(len(byts) + len(dic), len(file_list)):
-        counter = 8 - dic['depth']
+    if dic['depth'] <= 8:
+        number_decal = 2**dic['depth'] - 1
+        for i in range(length - 12, len(file_list)):
 
-        pix_file = file_list[i]
-        for j in range(8 // counter):
-            index = (pix_file & (number_decal << counter)) >> counter # Le décalage est mauvais
-            counter -= dic['depth']
-            pixel_list.append(byts[index - 1])
+            counter = 8 - dic['depth']
+            pix_file = file_list[i]
 
+            if dic['depth'] <= 8:
+                j = 0
+                while j < 8 // dic['depth'] and len(pixel_list) < k['width'] * k['height']:
+                    index = (pix_file & (number_decal << counter)) >> counter
+                    counter -= dic['depth']
+                    pixel_list.append(byts[index].copy())
+                    j += 1
+    else:
+        pixel_list = load_v1(file_list[length-12:])
     return pixel_list
 
 
-def get_header_info_v3(f, length: int) -> Tuple[dict, list['Pixel']]:
+def get_header_info_v3(f, length: int) -> Tuple[dict, list['Pixel'], int]:
     dic = {'depth': int(f[0]), 'rle': bool(f[1])}
     list_h_pixel = []
     for i in range(2, length - 14, 3):
@@ -139,7 +144,7 @@ def get_header_info_v3(f, length: int) -> Tuple[dict, list['Pixel']]:
         b = f[i+2]
         list_h_pixel.append(Pixel(r, g, b))
 
-    return dic, list_h_pixel
+    return dic, list_h_pixel, length
 
 
 def get_header_info(f) -> tuple[int, int, int, int]:
@@ -171,7 +176,7 @@ class Decoder:
         if 1 <= version <= 2:
             list_pixel = case[version](file_list)
         else:
-            list_pixel = case[version](file_list, lh=length_header)
+            list_pixel = case[version](file_list, lh=length_header, width=width, height=height)
         return Image(width, height, list_pixel)
 
 
@@ -183,6 +188,5 @@ if __name__ == '__main__':
     with open('./file.ulbmp', 'wb') as f:
         f.write(bytes.fromhex('554c424d50031700030001000200ff000000ff000000ff84'))
 
-    x = Decoder.load_from('./file.ulbmp')
-    print(x[2, 0].color)
+    x = Decoder.load_from('./imgs/house3_no_rle.ulbmp')
     # Encoder(x, 3, depth=1, rle=False).save_to('file.ulbmp')

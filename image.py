@@ -12,6 +12,7 @@ def verify_entries(width: int, height: int, pixels: list[Pixel]) -> int:
 
 class Image:
     def __init__(self, width: int, height: int, pixels: list['Pixel']) -> None:
+        print(width, height, len(pixels))
         verify_entries(width, height, pixels)
         self.__width = width
         self.__height = height

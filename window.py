@@ -55,6 +55,7 @@ class MyWidget(QtWidgets.QWidget):
         image_path = QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
         try:
             self.image = Decoder.load_from(image_path)
+            print(self.image)
         except Exception as e:
             QtWidgets.QErrorMessage(self).showMessage(str(e))
 
