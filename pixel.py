@@ -25,7 +25,11 @@ class Pixel:
         return f'{self.__red, 16} {self.__green, 16} {self.__blue, 16}'
 
     def __eq__(self, other) -> bool:
-        return self.__red == other.__red and self.__green == other.__green and self.__blue == other.__blue
+        if isinstance(other, tuple):
+            return self.color[0] == other[0] and self.color[1] == other[1] and self.color[2] == other[2]
+        if isinstance(other, Pixel):
+            return self.color[0] == other.color[0] \
+                and self.color[1] == other.color[1] and self.color[2] == other.color[2]
 
     def __ne__(self, other) -> bool:
         return not (self == other)

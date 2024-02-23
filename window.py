@@ -74,7 +74,7 @@ class MyWidget(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def save(self):
-        version = QtWidgets.QInputDialog.getInt(self, 'Version', 'Enter the version of the file', 1, 1, 2)[0]
+        version = QtWidgets.QInputDialog.getInt(self, 'Version', 'Enter the version of the file', 1, 1, 3)[0]
         choice = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
 
         if choice:

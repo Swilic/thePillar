@@ -1,5 +1,3 @@
-from typing import Tuple
-
 from image import Image
 from pixel import Pixel
 
@@ -11,22 +9,19 @@ def valid_kwarg(kwarg: dict, version: int) -> bool:
         raise ValueError('Missing depth or rle')
 
 
-def set_v1_v2_header(img: 'Image', version: int) -> bytes:
-    header = b'ULBMP' + version.to_bytes(length=1, byteorder='little', signed=False) + b'\x0c\x00'
+def get_header(img: 'Image', ver: int) -> tuple[bytes, bytes, bytes, bytes]:
+    extension = b'ULBMP' + ver.to_bytes(length=1, byteorder='little', signed=False)
     width = img.width.to_bytes(length=2, byteorder='little', signed=False)
     height = img.height.to_bytes(length=2, byteorder='little', signed=False)
-    return header + width + height
+    length_h = len(extension) + len(width) + len(height) + 2
+    length_h = length_h.to_bytes(length=2, byteorder='little', signed=False)
 
-
-def get_header(img: 'Image', ver: int) -> bytes:
-    if 1 <= ver <= 2:
-        return set_v1_v2_header(img, ver)
-    elif ver == 3:
-        ...
+    return extension, width, height, length_h
 
 
 def save_v1(f, img: 'Image') -> None:
-    f.write(get_header(img, 1))
+    extension, width, height, length_h = get_header(img, 1)
+    f.write(extension + length_h + width + height)
 
     for r, g, b in img:
         f.write(r.to_bytes(length=1, byteorder='big'))
@@ -41,7 +36,8 @@ def save_v2(f, img: 'Image') -> None:
         for i in range(3):
             file.write(pix.color[i].to_bytes(length=1, byteorder='big', signed=False))
 
-    f.write(get_header(img, 2))
+    extension, width, height, length_h = get_header(img, 2)
+    f.write(extension + length_h + width + height)
     count = 1
     for i in range(1, len(img)):
         if img[i] == img[i-1]:
@@ -55,8 +51,43 @@ def save_v2(f, img: 'Image') -> None:
     write(f, count, img[-1])
 
 
-def save_v3():
-    ...
+def get_index(palette: set, pixel: 'Pixel') -> int:
+    for i, p in enumerate(palette):
+        if p == pixel:
+            return i
+
+
+def translate_to_byte(palette: set, depth: int, rle: bool) -> list[bytes]:
+    l = [depth.to_bytes(length=1, byteorder='big', signed=False),
+         int(rle).to_bytes(length=1, byteorder='big', signed=False)]
+
+    for tup in palette:
+        for i in tup:
+            l.append(i.to_bytes(length=1, byteorder='big', signed=False))
+
+    return l
+
+
+def save_v3(f, image: 'Image', **kwargs) -> None:
+    head = get_header(image, 3)
+    palette = set(image)
+    depth = kwargs.get('depth')
+    rle = kwargs.get('rle')
+    length_h = int.from_bytes(head[3], byteorder='little', signed=False) + len(palette)*3 + 2
+    length_h = length_h.to_bytes(length=2, byteorder='little', signed=False)
+    to_write = translate_to_byte(palette, depth, rle)
+    f.write(head[0] + length_h + head[1] + head[2])
+    for i in range(0, len(to_write)):
+        f.write(to_write[i])
+
+    for i in range(0, len(image) - 1, 8):
+        indexs = 0
+        for j in range(8//depth):
+            if i+j < len(image):
+                index = get_index(palette, image[i+j])
+                indexs += index << (8 - depth * (j + 1))
+
+        f.write(indexs.to_bytes(length=depth, byteorder='big', signed=False))
 
 
 class Encoder:
@@ -74,7 +105,10 @@ class Encoder:
             3: save_v3,
         }
         with open(path, 'wb') as f:
-            case[self.version](f, self.image)
+            if 1 <= self.version <= 2:
+                case[self.version](f, self.image)
+            else:
+                case[self.version](f, self.image, depth=self.depth, rle=self.rle)
 
     @property
     def image(self) -> 'Image':
@@ -83,6 +117,14 @@ class Encoder:
     @property
     def version(self) -> int:
         return self.__version
+
+    @property
+    def depth(self) -> int:
+        return self.__depth
+
+    @property
+    def rle(self) -> bool:
+        return self.__rle
 
 
 def verify_header(ulbmp: bytes) -> bool:
@@ -95,7 +137,7 @@ def verify_header(ulbmp: bytes) -> bool:
     return True
 
 
-def load_v1(file_list) -> list['Pixel']:
+def load_basic_rgb(file_list) -> list['Pixel']:
     pixel_list = []
     for i in range(0, len(file_list), 3):
         pixel_list.append(Pixel(file_list[i], file_list[i + 1], file_list[i + 2]))
@@ -131,20 +173,20 @@ def load_v3(file_list, **k) -> list['Pixel']:
                     pixel_list.append(byts[index].copy())
                     j += 1
     else:
-        pixel_list = load_v1(file_list[length-12:])
+        pixel_list = load_basic_rgb(file_list[length - 12:])
     return pixel_list
 
 
-def get_header_info_v3(f, length: int) -> Tuple[dict, list['Pixel'], int]:
+def get_header_info_v3(f, length: int) -> tuple[dict, list['Pixel'], int]:
     dic = {'depth': int(f[0]), 'rle': bool(f[1])}
-    list_h_pixel = []
+    list_header_pixel = []
     for i in range(2, length - 14, 3):
         r = f[i]
         g = f[i+1]
         b = f[i+2]
-        list_h_pixel.append(Pixel(r, g, b))
+        list_header_pixel.append(Pixel(r, g, b))
 
-    return dic, list_h_pixel, length
+    return dic, list_header_pixel, length
 
 
 def get_header_info(f) -> tuple[int, int, int, int]:
@@ -162,7 +204,7 @@ class Decoder:
     @staticmethod
     def load_from(path: str) -> 'Image':
         case = {
-            1: load_v1,
+            1: load_basic_rgb,
             2: load_v2,
             3: load_v3,
         }
@@ -184,9 +226,9 @@ if __name__ == '__main__':
     BLACK = Pixel(0, 0, 0)
     WHITE = Pixel(0xFF, 0xFF, 0xFF)
     image = Image(1, 1, [BLACK])
-    # x = Decoder.load_from('./imgs/checkers2.ulbmp')
-    with open('./file.ulbmp', 'wb') as f:
-        f.write(bytes.fromhex('554c424d50031700030001000200ff000000ff000000ff84'))
-
-    x = Decoder.load_from('./imgs/house3_no_rle.ulbmp')
-    # Encoder(x, 3, depth=1, rle=False).save_to('file.ulbmp')
+    x = Decoder.load_from('./imgs/checkers3_no_rle.ulbmp')
+    # with open('./file.ulbmp', 'wb') as f:
+    #     f.write(bytes.fromhex('554c424d50031700030001000200ff000000ff000000ff84'))
+    #
+    # x = Decoder.load_from('./imgs/house3_no_rle.ulbmp')
+    Encoder(x, 3, depth=1, rle=False).save_to('file.ulbmp')
