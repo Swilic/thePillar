@@ -40,13 +40,13 @@ def save_v2(f, img: 'Image') -> None:
     f.write(extension + length_h + width + height)
     count = 1
     for i in range(1, len(img)):
-        if img[i] == img[i-1]:
+        if img[i] == img[i - 1]:
             count += 1
         else:
-            write(f, count, img[i-1])
+            write(f, count, img[i - 1])
             count = 1
         if count == 255:
-            write(f, 255, img[i-1])
+            write(f, 255, img[i - 1])
             count = 0
     write(f, count, img[-1])
 
@@ -73,7 +73,7 @@ def save_v3(f, image: 'Image', **kwargs) -> None:
     palette = set(image)
     depth = kwargs.get('depth')
     rle = kwargs.get('rle')
-    length_h = int.from_bytes(head[3], byteorder='little', signed=False) + len(palette)*3 + 2
+    length_h = int.from_bytes(head[3], byteorder='little', signed=False) + len(palette) * 3 + 2
     length_h = length_h.to_bytes(length=2, byteorder='little', signed=False)
     to_write = translate_to_byte(palette, depth, rle)
     f.write(head[0] + length_h + head[1] + head[2])
@@ -82,9 +82,9 @@ def save_v3(f, image: 'Image', **kwargs) -> None:
 
     for i in range(0, len(image) - 1, 8):
         indexs = 0
-        for j in range(8//depth):
-            if i+j < len(image):
-                index = get_index(palette, image[i+j])
+        for j in range(8 // depth):
+            if i + j < len(image):
+                index = get_index(palette, image[i + j])
                 indexs += index << (8 - depth * (j + 1))
 
         f.write(indexs.to_bytes(length=depth, byteorder='big', signed=False))
@@ -148,8 +148,38 @@ def load_basic_rgb(file_list) -> list['Pixel']:
 def load_with_rle(file_list) -> list['Pixel']:
     pixel_list = list()
     for i in range(0, len(file_list), 4):
-        for j in range(int.from_bytes(file_list[i:i+1], byteorder='big', signed=False)):
-            pixel_list.append(Pixel(file_list[i+1], file_list[i+2], file_list[i+3]))
+        for j in range(int.from_bytes(file_list[i:i + 1], byteorder='big', signed=False)):
+            pixel_list.append(Pixel(file_list[i + 1], file_list[i + 2], file_list[i + 3]))
+
+    return pixel_list
+
+
+def set_v3_rle_8(file_list, *dic) -> list['Pixel']:
+    dic, byts, length = dic
+    pixel_list = []
+    for i in range(length - 12, len(file_list), 2):
+        for j in range(file_list[i]):
+            index = file_list[i + 1]
+            pixel_list.append(byts[index].copy())
+
+    print(pixel_list)
+    return pixel_list
+
+
+def set_pixel_v3_no_rle_1to8(file_list, *dic, **k) -> list['Pixel']:
+    dic, byts, length = dic
+    pixel_list = []
+    number_decal = 2 ** dic['depth'] - 1
+    for i in range(len(file_list)):
+        counter = 8 - dic['depth']
+        pix_file = file_list[i]
+
+        j = 0
+        while j < 8 // dic['depth'] and len(pixel_list) < (k['width'] * k['height']):
+            index = (pix_file & (number_decal << counter)) >> counter
+            counter -= dic['depth']
+            pixel_list.append(byts[index].copy())
+            j += 1
 
     return pixel_list
 
@@ -158,42 +188,39 @@ def load_v3(file_list, **k) -> list['Pixel']:
     dic, byts, length = get_header_info_v3(file_list, k['lh'])
 
     pixel_list = []
-    if dic['depth'] <= 8:
-        number_decal = 2**dic['depth'] - 1
-        for i in range(length - 12, len(file_list)):
+    if not dic['rle']:
+        if dic['depth'] <= 8:
+            pixel_list = set_pixel_v3_no_rle_1to8(file_list[length - 12:], dic, byts, length, lh=k['lh'],
+                                                  width=k['width'], height=k['height'])
 
-            counter = 8 - dic['depth']
-            pix_file = file_list[i]
-
-            if dic['depth'] <= 8:
-                j = 0
-                while j < 8 // dic['depth'] and len(pixel_list) < k['width'] * k['height']:
-                    index = (pix_file & (number_decal << counter)) >> counter
-                    counter -= dic['depth']
-                    pixel_list.append(byts[index].copy())
-                    j += 1
+        elif dic['depth'] == 24:
+            pixel_list = load_basic_rgb(file_list[length - 14:])
     else:
-        pixel_list = load_basic_rgb(file_list[length - 12:])
+        pixel_list = load_v3_rle(file_list, dic, byts, length)
+
     return pixel_list
 
 
-def load_v3_rle(file_list, **k) -> list['Pixel']:
-    dic, byts, length = get_header_info_v3(file_list, k['lh'])
-    if dic['depth'] > 24:
-        return load_with_rle(file_list[length - 12:])
+def load_v3_rle(file_list, *arg) -> list['Pixel']:
+    dic, byts, length = arg
 
-    pixel_list = []
+    if dic['depth'] == 24:
+        pixel_list = load_with_rle(file_list[length - 14])
+    elif dic['depth'] == 8:
+        pixel_list = set_v3_rle_8(file_list, dic, byts, length)
+    else:
+        raise NotImplementedError
 
+    return pixel_list
 
 
 def get_header_info_v3(f, length: int) -> tuple[dict, list['Pixel'], int]:
-    print(f[:30])
     dic = {'depth': int(f[0]), 'rle': bool(f[1])}
     list_header_pixel = []
     for i in range(2, length - 14, 3):
         r = f[i]
-        g = f[i+1]
-        b = f[i+2]
+        g = f[i + 1]
+        b = f[i + 2]
         list_header_pixel.append(Pixel(r, g, b))
 
     return dic, list_header_pixel, length
@@ -236,7 +263,7 @@ if __name__ == '__main__':
     BLACK = Pixel(0, 0, 0)
     WHITE = Pixel(0xFF, 0xFF, 0xFF)
     image = Image(1, 1, [BLACK])
-    x = Decoder.load_from('./imgs/jelly_beans3_rle.ulbmp')
+    x = Decoder.load_from('./imgs/house3_rle.ulbmp')
     # with open('./file.ulbmp', 'wb') as f:
     #     f.write(bytes.fromhex('554c424d50031700030001000200ff000000ff000000ff84'))
     #
