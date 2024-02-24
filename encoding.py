@@ -145,7 +145,7 @@ def load_basic_rgb(file_list) -> list['Pixel']:
     return pixel_list
 
 
-def load_v2(file_list) -> list['Pixel']:
+def load_with_rle(file_list) -> list['Pixel']:
     pixel_list = list()
     for i in range(0, len(file_list), 4):
         for j in range(int.from_bytes(file_list[i:i+1], byteorder='big', signed=False)):
@@ -177,7 +177,17 @@ def load_v3(file_list, **k) -> list['Pixel']:
     return pixel_list
 
 
+def load_v3_rle(file_list, **k) -> list['Pixel']:
+    dic, byts, length = get_header_info_v3(file_list, k['lh'])
+    if dic['depth'] > 24:
+        return load_with_rle(file_list[length - 12:])
+
+    pixel_list = []
+
+
+
 def get_header_info_v3(f, length: int) -> tuple[dict, list['Pixel'], int]:
+    print(f[:30])
     dic = {'depth': int(f[0]), 'rle': bool(f[1])}
     list_header_pixel = []
     for i in range(2, length - 14, 3):
@@ -205,7 +215,7 @@ class Decoder:
     def load_from(path: str) -> 'Image':
         case = {
             1: load_basic_rgb,
-            2: load_v2,
+            2: load_with_rle,
             3: load_v3,
         }
         with open(path, 'rb') as f:
@@ -226,7 +236,7 @@ if __name__ == '__main__':
     BLACK = Pixel(0, 0, 0)
     WHITE = Pixel(0xFF, 0xFF, 0xFF)
     image = Image(1, 1, [BLACK])
-    x = Decoder.load_from('./imgs/checkers3_no_rle.ulbmp')
+    x = Decoder.load_from('./imgs/jelly_beans3_rle.ulbmp')
     # with open('./file.ulbmp', 'wb') as f:
     #     f.write(bytes.fromhex('554c424d50031700030001000200ff000000ff000000ff84'))
     #
