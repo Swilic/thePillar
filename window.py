@@ -55,7 +55,6 @@ class MyWidget(QtWidgets.QWidget):
         image_path = QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
         try:
             self.image = Decoder.load_from(image_path)
-            print(self.image)
         except Exception as e:
             QtWidgets.QErrorMessage(self).showMessage(str(e))
 
@@ -75,10 +74,12 @@ class MyWidget(QtWidgets.QWidget):
     @QtCore.Slot()
     def save(self):
         version = QtWidgets.QInputDialog.getInt(self, 'Version', 'Enter the version of the file', 1, 1, 3)[0]
+        rle = False
         choice = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
 
         if choice:
-            Encoder(self.image, version).save_to(choice + '.ulbmp')
+            extension = '.ulbmp' if choice[len(choice)-5:] != 'ulbmp' else ''
+            Encoder(self.image, version, rle=rle, depth=24).save_to(choice + extension)
 
 
 if __name__ == "__main__":

@@ -69,6 +69,7 @@ def translate_to_byte(palette: set, depth: int, rle: bool) -> list[bytes]:
 
 
 def save_v3(f, image: 'Image', **kwargs) -> None:
+    # à mettre dans une fonction!
     head = get_header(image, 3)
     palette = set(image)
     depth = kwargs.get('depth')
@@ -146,9 +147,11 @@ def load_basic_rgb(file_list) -> list['Pixel']:
 
 
 def load_with_rle(file_list) -> list['Pixel']:
-    pixel_list = list()
+    pixel_list = []
+
     for i in range(0, len(file_list), 4):
-        for j in range(int.from_bytes(file_list[i:i + 1], byteorder='big', signed=False)):
+        for j in range(file_list[i]):
+
             pixel_list.append(Pixel(file_list[i + 1], file_list[i + 2], file_list[i + 3]))
 
     return pixel_list
@@ -162,7 +165,6 @@ def set_v3_rle_8(file_list, *dic) -> list['Pixel']:
             index = file_list[i + 1]
             pixel_list.append(byts[index].copy())
 
-    print(pixel_list)
     return pixel_list
 
 
@@ -194,8 +196,9 @@ def load_v3(file_list, **k) -> list['Pixel']:
                                                   width=k['width'], height=k['height'])
 
         elif dic['depth'] == 24:
-            pixel_list = load_basic_rgb(file_list[length - 14:])
+            pixel_list = load_basic_rgb(file_list[2:])
     else:
+
         pixel_list = load_v3_rle(file_list, dic, byts, length)
 
     return pixel_list
@@ -205,7 +208,7 @@ def load_v3_rle(file_list, *arg) -> list['Pixel']:
     dic, byts, length = arg
 
     if dic['depth'] == 24:
-        pixel_list = load_with_rle(file_list[length - 14])
+        pixel_list = load_with_rle(file_list)
     elif dic['depth'] == 8:
         pixel_list = set_v3_rle_8(file_list, dic, byts, length)
     else:
@@ -251,6 +254,7 @@ class Decoder:
             except Exception as e:
                 raise e
             file_list = f.read()
+            print(len(file_list))
 
         if 1 <= version <= 2:
             list_pixel = case[version](file_list)
@@ -263,9 +267,9 @@ if __name__ == '__main__':
     BLACK = Pixel(0, 0, 0)
     WHITE = Pixel(0xFF, 0xFF, 0xFF)
     image = Image(1, 1, [BLACK])
-    x = Decoder.load_from('./imgs/house3_rle.ulbmp')
+    # x = Decoder.load_from('./imgs/gradients3_rle.ulbmp')
     # with open('./file.ulbmp', 'wb') as f:
     #     f.write(bytes.fromhex('554c424d50031700030001000200ff000000ff000000ff84'))
     #
-    # x = Decoder.load_from('./imgs/house3_no_rle.ulbmp')
-    Encoder(x, 3, depth=1, rle=False).save_to('file.ulbmp')
+    x = Decoder.load_from('./imgs/house3_rle.ulbmp')
+    # Encoder(x, 3, depth=1, rle=False).save_to('file.ulbmp')
