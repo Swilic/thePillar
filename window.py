@@ -1,6 +1,7 @@
 import sys
 import os
 from encoding import Encoder, Decoder
+from dialogWindow import PopupWindow
 from PySide6 import QtCore, QtWidgets, QtGui
 
 
@@ -73,7 +74,10 @@ class MyWidget(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def save(self):
-        version = QtWidgets.QInputDialog.getInt(self, 'Version', 'Enter the version of the file', 1, 1, 3)[0]
+        popup = PopupWindow()
+        if popup.exec():
+            rle, version, depth = popup.get_values()
+
         rle = False
         choice = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
 

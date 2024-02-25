@@ -198,8 +198,7 @@ def load_v3(file_list, **k) -> list['Pixel']:
         elif dic['depth'] == 24:
             pixel_list = load_basic_rgb(file_list[2:])
     else:
-
-        pixel_list = load_v3_rle(file_list, dic, byts, length)
+        pixel_list = load_v3_rle(file_list[2:], dic, byts, length)
 
     return pixel_list
 
@@ -254,7 +253,6 @@ class Decoder:
             except Exception as e:
                 raise e
             file_list = f.read()
-            print(len(file_list))
 
         if 1 <= version <= 2:
             list_pixel = case[version](file_list)
