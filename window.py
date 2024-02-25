@@ -75,15 +75,17 @@ class MyWidget(QtWidgets.QWidget):
     @QtCore.Slot()
     def save(self):
         popup = PopupWindow()
-        if popup.exec():
-            rle, version, depth = popup.get_values()
+        popup.exec()
+        rle, version, depth = popup.get_values()
+        if rle and depth < 8:
+            QtWidgets.QErrorMessage(self).showMessage('La profondeur doit être supérieure ou égale à 8 pour le RLE')
+            return
 
-        rle = False
         choice = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
 
         if choice:
             extension = '.ulbmp' if choice[len(choice)-5:] != 'ulbmp' else ''
-            Encoder(self.image, version, rle=rle, depth=24).save_to(choice + extension)
+            Encoder(self.image, version, rle=rle, depth=depth).save_to(choice + extension)
 
 
 if __name__ == "__main__":
