@@ -5,7 +5,7 @@ from pixel import Pixel
 def valid_kwarg(kwarg: dict, version: int) -> bool:
     if version != 3:
         return True
-    if kwarg.get('depth') is None or kwarg.get('rle') is None:
+    if kwarg['depth'] is None or kwarg['rle'] is None:
         raise ValueError('Missing depth or rle')
 
 
@@ -68,15 +68,7 @@ def translate_to_byte(palette: set, depth: int, rle: bool) -> list[bytes]:
     return l
 
 
-def save_v3_rle(f, image: 'Image', depth: int):
-    match depth:
-        case 8:
-            ...
-        case 24:
-            save_v2(f, image, 3)
-
-
-def save_v3_1to8(f, image: 'Image', *args):
+def write_header_v3(f, image: 'Image', *args):
     head = get_header(image, 3)
     palette, depth, rle = args
     length_h = int.from_bytes(head[3], byteorder='little', signed=False) + len(palette) * 3 + 2
@@ -86,26 +78,49 @@ def save_v3_1to8(f, image: 'Image', *args):
     for i in range(0, len(to_write)):
         f.write(to_write[i])
 
-    for i in range(0, len(image) - 1, 8):
+
+def save_v3_8_rle(f, image, *args):
+    palette, depth, rle = args
+    write_header_v3(f, image, palette, depth, rle)
+    ...
+
+
+def save_v3_rle(f, image: 'Image', *args):
+    palette, depth, rle = args
+    match depth:
+        case 8:
+            return save_v3_8_rle(f, image, palette, depth, rle)
+        case 24:
+            return save_v2(f, image, 3)
+
+
+def save_v3_1to8(f, image: 'Image', *args):
+    palette, depth, rle = args
+    write_header_v3(f, image, palette, depth, rle)
+
+    for i in range(0, len(image), 8 // depth):
+
         indexs = 0
         for j in range(8 // depth):
+            # 01 10
             if i + j < len(image):
                 index = get_index(palette, image[i + j])
                 indexs += index << (8 - depth * (j + 1))
 
-        f.write(indexs.to_bytes(length=depth, byteorder='big', signed=False))
+        f.write(indexs.to_bytes(length=1, byteorder='big', signed=False))
 
 
 def save_v3(f, image: 'Image', **kwargs) -> None:
     palette = set(image)
-    depth = kwargs.get('depth')
-    rle = kwargs.get('rle')
+    depth = kwargs['depth']
+    rle = kwargs['rle']
     if rle:
-        return save_v3_rle(f, image, depth)
+        return save_v3_rle(f, image, palette, depth, rle)
     elif not rle and depth == 24:
         return save_v1(f, image, 3)
     elif depth <= 8:
-        save_v3_1to8(f, image, palette, depth, rle)
+        # no rle as the definition
+        return save_v3_1to8(f, image, palette, depth, rle)
 
 
 class Encoder:
@@ -180,14 +195,15 @@ def set_v3_rle_8(file_list, *dic) -> list['Pixel']:
         for j in range(file_list[i]):
             index = file_list[i + 1]
             pixel_list.append(byts[index].copy())
-    print(pixel_list)
+
     return pixel_list
 
 
-def set_pixel_v3_no_rle_1to8(file_list, *dic, **k) -> list['Pixel']:
-    dic, byts, length = dic
+def set_pixel_v3_no_rle_1to8(file_list, *arg, **k) -> list['Pixel']:
+    dic, byts, length = arg
     pixel_list = []
     number_decal = 2 ** dic['depth'] - 1
+
     for i in range(len(file_list)):
         counter = 8 - dic['depth']
         pix_file = file_list[i]
@@ -198,6 +214,19 @@ def set_pixel_v3_no_rle_1to8(file_list, *dic, **k) -> list['Pixel']:
             counter -= dic['depth']
             pixel_list.append(byts[index].copy())
             j += 1
+
+    return pixel_list
+
+
+def load_v3_rle(file_list, *arg) -> list['Pixel']:
+    dic, byts, length = arg
+
+    if dic['depth'] == 24:
+        pixel_list = load_with_rle(file_list[2:])
+    elif dic['depth'] == 8:
+        pixel_list = set_v3_rle_8(file_list, dic, byts, length)
+    else:
+        raise NotImplementedError
 
     return pixel_list
 
@@ -215,19 +244,6 @@ def load_v3(file_list, **k) -> list['Pixel']:
             pixel_list = load_basic_rgb(file_list[2:])
     else:
         pixel_list = load_v3_rle(file_list, dic, byts, length)
-
-    return pixel_list
-
-
-def load_v3_rle(file_list, *arg) -> list['Pixel']:
-    dic, byts, length = arg
-
-    if dic['depth'] == 24:
-        pixel_list = load_with_rle(file_list[2:])
-    elif dic['depth'] == 8:
-        pixel_list = set_v3_rle_8(file_list, dic, byts, length)
-    else:
-        raise NotImplementedError
 
     return pixel_list
 
@@ -284,6 +300,7 @@ if __name__ == '__main__':
     # x = Decoder.load_from('./imgs/gradients3_rle.ulbmp')
     # with open('./file.ulbmp', 'wb') as f:
     #     f.write(bytes.fromhex('554c424d50031700030001000200ff000000ff000000ff84'))
-    #
-    x = Decoder.load_from('./imgs/house3_no_rle.ulbmp')
-    Encoder(x, 3, depth=24, rle=False).save_to('file.ulbmp')
+    y = Decoder.load_from('./imgs/squares3_no_rle.ulbmp')
+    Encoder(y, 3, depth=4, rle=False).save_to('./file.ulbmp')
+    x = Decoder.load_from('./file.ulbmp')
+    # Encoder(x, 3, depth=24, rle=False).save_to('file.ulbmp')
