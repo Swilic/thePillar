@@ -22,7 +22,7 @@ class Pixel:
         self.__blue = b
 
     def __str__(self) -> str:
-        return f'{self.__red, 16} {self.__green, 16} {self.__blue, 16}'
+        return f'{self.__red} {self.__green} {self.__blue}'
 
     def __eq__(self, other) -> bool:
         if isinstance(other, tuple):
