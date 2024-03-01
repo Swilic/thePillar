@@ -1,3 +1,10 @@
+"""
+NOM : <Kazberuk>
+PRÉNOM : <Denis>
+SECTION : <INFO>
+MATRICULE : <000589811>
+"""
+
 from image import Image
 from pixel import Pixel
 
@@ -16,11 +23,33 @@ def get_header(img: 'Image', ver: int) -> tuple[bytes, bytes, bytes, bytes]:
     length_h = len(extension) + len(width) + len(height) + 2
     length_h = length_h.to_bytes(length=2, byteorder='little', signed=False)
 
-    return extension, width, height, length_h
+    return extension, length_h, width, height
+
+
+def translate_to_byte(palette: set, depth: int, rle: bool) -> list[bytes]:
+    list_info_v3 = [depth.to_bytes(length=1, byteorder='big', signed=False),
+                    int(rle).to_bytes(length=1, byteorder='big', signed=False)]
+
+    for tup in palette:
+        for i in tup:
+            list_info_v3.append(i.to_bytes(length=1, byteorder='big', signed=False))
+
+    return list_info_v3
+
+
+def write_header_v3(f, image: 'Image', *args):
+    extension, length_h, width, height = get_header(image, 3)
+    palette, depth, rle = args
+    full_length_h = int.from_bytes(length_h, byteorder='little', signed=False) + len(palette) * 3 + 2
+    full_length_h = full_length_h.to_bytes(length=2, byteorder='little', signed=False)
+    to_write = translate_to_byte(palette, depth, rle)
+    f.write(extension + full_length_h + width + height)
+    for i in range(0, len(to_write)):
+        f.write(to_write[i])
 
 
 def save_v1(f, img: 'Image', ver: int = 1) -> None:
-    extension, width, height, length_h = get_header(img, ver)
+    extension, length_h, width, height = get_header(img, ver)
     f.write(extension + length_h + width + height)
 
     for r, g, b in img:
@@ -36,7 +65,7 @@ def save_v2(f, img: 'Image', ver: int = 2) -> None:
         for i in range(3):
             file.write(pix.color[i].to_bytes(length=1, byteorder='big', signed=False))
 
-    extension, width, height, length_h = get_header(img, ver)
+    extension, length_h, width, height = get_header(img, ver)
     f.write(extension + length_h + width + height)
     count = 1
     for i in range(1, len(img)):
@@ -55,28 +84,6 @@ def get_index(palette: set, pixel: 'Pixel') -> int:
     for i, p in enumerate(palette):
         if p == pixel:
             return i
-
-
-def translate_to_byte(palette: set, depth: int, rle: bool) -> list[bytes]:
-    l = [depth.to_bytes(length=1, byteorder='big', signed=False),
-         int(rle).to_bytes(length=1, byteorder='big', signed=False)]
-
-    for tup in palette:
-        for i in tup:
-            l.append(i.to_bytes(length=1, byteorder='big', signed=False))
-
-    return l
-
-
-def write_header_v3(f, image: 'Image', *args):
-    head = get_header(image, 3)
-    palette, depth, rle = args
-    length_h = int.from_bytes(head[3], byteorder='little', signed=False) + len(palette) * 3 + 2
-    length_h = length_h.to_bytes(length=2, byteorder='little', signed=False)
-    to_write = translate_to_byte(palette, depth, rle)
-    f.write(head[0] + length_h + head[1] + head[2])
-    for i in range(0, len(to_write)):
-        f.write(to_write[i])
 
 
 def save_v3_8_rle(f, image, *args):
@@ -102,7 +109,6 @@ def save_v3_1to8(f, image: 'Image', *args):
 
         indexs = 0
         for j in range(8 // depth):
-            # 01 10
             if i + j < len(image):
                 index = get_index(palette, image[i + j])
                 indexs += index << (8 - depth * (j + 1))
@@ -123,6 +129,97 @@ def save_v3(f, image: 'Image', **kwargs) -> None:
         return save_v3_1to8(f, image, palette, depth, rle)
 
 
+def save_v4(f, image: 'Image') -> None:
+    extension, length_h, width, height = get_header(image, 4)
+    f.write(extension + length_h + width + height)
+    first_black = Pixel(0, 0, 0)
+    pixel_list = [first_black] + image.pixels
+    for i in range(1, len(pixel_list)):
+        dr = pixel_list[i].color[0] - pixel_list[i - 1].color[0]
+        dg = pixel_list[i].color[1] - pixel_list[i - 1].color[1]
+        db = pixel_list[i].color[2] - pixel_list[i - 1].color[2]
+        drg = dr - dg
+        drb = dr - db
+        dgb = dg - db
+        dgr = dg - dr
+        dbr = db - dr
+        dbg = db - dg
+        if -2 <= dr <= 2 and -2 <= dg <= 2 and -2 <= db <= 2:
+            dr += 2
+            dg += 2
+            db += 2
+
+            new = (dr << 4) + (dg << 2) + db
+            f.write(new.to_bytes(length=1, byteorder='big'))
+
+        elif -32 <= dg <= 31 and -8 <= drg <= 7 and -8 <= dbg <= 7:
+            dg += 32
+            drg += 8
+            dbg += 8
+
+            new1 = 64 + dg
+            new2 = (drg << 4) + dbg
+            f.write(new1.to_bytes(length=1, byteorder='big'))
+            f.write(new2.to_bytes(length=1, byteorder='big'))
+
+        elif -128 <= dr <= 127 and -32 <= dgr <= 31 and -32 <= dbr <= 31:
+            dr += 128
+            dgr += 32
+            dbr += 32
+
+            mi_dr_g = dr >> 4
+            mi_dr_d = dr & 0b1111
+            new = 128 + mi_dr_g
+            mi_dgr_g = drg >> 2
+            mi_dgr_d = drg & 0b11
+            new2 = (mi_dr_d << 4) + mi_dgr_g
+            new3 = (mi_dgr_d << 6) + dbr
+            f.write(new.to_bytes(length=1, byteorder='big'))
+            f.write(new2.to_bytes(length=1, byteorder='big'))
+            f.write(new3.to_bytes(length=1, byteorder='big'))
+        elif -128 <= dg <= 127 and -32 <= drg <= 31 and -32 <= dbg <= 31:
+            dg += 128
+            drg += 32
+            dbg += 32
+
+            mi_dg_g = dg >> 4
+            mi_dg_d = dg & 0b1111
+            new1 = 144 + mi_dg_g
+            mi_drg_g = drg >> 2
+            mi_drg_d = drg & 0b11
+            new2 = (mi_dg_d << 4) + mi_drg_g
+            new3 = (mi_drg_d << 6) + dbg
+            f.write(new1.to_bytes(length=1, byteorder='big'))
+            f.write(new2.to_bytes(length=1, byteorder='big'))
+            f.write(new3.to_bytes(length=1, byteorder='big'))
+
+        elif -128 <= db <= 127 and -32 <= drb <= 31 and -32 <= dgb <= 31:
+            db += 128
+            drb += 32
+            dgb += 32
+
+            mi_db_g = dr >> 4
+            mi_db_d = dr & 0b1111
+            new = 160 + mi_db_g
+            mi_drb_g = drg >> 2
+            mi_drb_d = drg & 0b11
+            new2 = (mi_db_d << 4) + mi_drb_g
+            new3 = (mi_drb_d >> 6) + dgb
+            f.write(new.to_bytes(length=1, byteorder='big'))
+            f.write(new2.to_bytes(length=1, byteorder='big'))
+            f.write(new3.to_bytes(length=1, byteorder='big'))
+
+        else:
+            new = 255
+            new1 = pixel_list[i].color[0]
+            new2 = pixel_list[i].color[1]
+            new3 = pixel_list[i].color[2]
+            f.write(new.to_bytes(length=1, byteorder='big'))
+            f.write(new1.to_bytes(length=1, byteorder='big'))
+            f.write(new2.to_bytes(length=1, byteorder='big'))
+            f.write(new3.to_bytes(length=1, byteorder='big'))
+
+
 class Encoder:
     def __init__(self, img: 'Image', version: int = 1, **kwargs):
         valid_kwarg(kwargs, version)
@@ -136,9 +233,10 @@ class Encoder:
             1: save_v1,
             2: save_v2,
             3: save_v3,
+            4: save_v4,
         }
         with open(path, 'wb') as f:
-            if 1 <= self.version <= 2:
+            if 1 <= self.version <= 2 or self.version == 4:
                 case[self.version](f, self.image)
             else:
                 case[self.version](f, self.image, depth=self.depth, rle=self.rle)
@@ -248,6 +346,93 @@ def load_v3(file_list, **k) -> list['Pixel']:
     return pixel_list
 
 
+def load_v4(file_list) -> list['Pixel']:
+    pixel_list = [Pixel(0, 0, 0)]
+    i = 0
+    while i < len(file_list):
+        actual = pixel_list[-1]
+        actual_r, actual_g, actual_b = actual.color
+        # print(actual_r, actual_g, actual_b)
+        did = False
+
+        diff = (file_list[i] & 0b10000000) >> 7
+        if diff == 0:
+            diff = (file_list[i] & 0b11000000) >> 6
+
+            if diff == 0:
+                # SMALL_DIFF
+                r = -2 + ((file_list[i] & 0b00110000) >> 4)
+                g = -2 + ((file_list[i] & 0b00001100) >> 2)
+                b = -2 + (file_list[i] & 0b00000011)
+                # print(actual_r + r, actual_g + g, actual_b + b)
+                pixel_list.append(Pixel(actual_r + r, actual_g + g, actual_b + b))
+            elif diff == 1:
+                # INTERMEDIATE_DIFF
+                dg = -32 + (file_list[i] & 0b0011111)
+                drg = -8 + ((file_list[i + 1] & 0b11110000) >> 4)
+                dbg = -8 + (file_list[i + 1] & 0b00001111)
+                r = actual_r + dg + drg
+                g = actual_g + dg
+                b = actual_b + dg + dbg
+
+                pixel_list.append(Pixel(r, g, b))
+                i += 1
+            did = True
+
+        diff = (file_list[i] & 0b11110000) >> 4
+        if not did:
+            if diff == 8:
+                # BIG_DIFF_R
+                drg = (-128 + (file_list[i + 1] & 0b00001111)) << 4
+                dr = drg + (file_list[i + 2] & 0b11110000)
+                dgrd = (-32 + (file_list[i + 2] & 0b00001111)) << 2
+                dgr = dgrd + ((file_list[i + 3] & 0b11000000) >> 6)
+                dbr = (-32 + (file_list[i + 3] & 0b00111111))
+                r = actual_r + dr
+                g = actual_g + dr + dgr
+                b = actual_b + dr + dbr
+                pixel_list.append(Pixel(r, g, b))
+                i += 3
+
+            elif diff == 9:
+                # BIG_DIFF_G
+                dgg = (file_list[i] & 0b00001111) << 4
+                dg = -128 + (dgg + ((file_list[i + 1] & 0b11110000) >> 4))
+                dgrd = (file_list[i + 1] & 0b00001111) << 2
+                dgr = -32 + (dgrd + ((file_list[i + 3] & 0b11000000) >> 6))
+                dbg = (-32 + (file_list[i + 2] & 0b00111111))
+                r = actual_r + dg + dgr
+                g = actual_g + dg
+                b = actual_b + dg + dbg
+                pixel_list.append(Pixel(r, g, b))
+                i += 2
+
+            elif diff == 10:
+                # BIG_DIFF_B
+                # Celui là est bon
+                dbg = (file_list[i] & 0b00001111) << 4
+                db = -128 + (dbg + ((file_list[i + 1] & 0b11110000) >> 4))
+                drbd = (file_list[i + 1] & 0b00001111) << 2
+                drb = -32 + (drbd + ((file_list[i + 3] & 0b11000000) >> 6))
+                dgb = (-32 + (file_list[i + 2] & 0b00111111))
+
+                r = actual_r + db + drb
+                g = actual_g + db + dgb
+                b = actual_b + db
+                pixel_list.append(Pixel(r, g, b))
+                i += 2
+
+            elif diff == 15:
+                r = file_list[i + 1]
+                g = file_list[i + 2]
+                b = file_list[i + 3]
+                pixel_list.append(Pixel(r, g, b))
+                i += 3
+        i += 1
+
+    return pixel_list[1:]
+
+
 def get_header_info_v3(f, length: int) -> tuple[dict, list['Pixel'], int]:
     dic = {'depth': int(f[0]), 'rle': bool(f[1])}
     list_header_pixel = []
@@ -278,6 +463,7 @@ class Decoder:
             1: load_basic_rgb,
             2: load_with_rle,
             3: load_v3,
+            4: load_v4,
         }
         with open(path, 'rb') as f:
             try:
@@ -286,7 +472,7 @@ class Decoder:
                 raise e
             file_list = f.read()
 
-        if 1 <= version <= 2:
+        if 1 <= version <= 2 or version == 4:
             list_pixel = case[version](file_list)
         else:
             list_pixel = case[version](file_list, lh=length_header, width=width, height=height)
@@ -300,7 +486,7 @@ if __name__ == '__main__':
     # x = Decoder.load_from('./imgs/gradients3_rle.ulbmp')
     # with open('./file.ulbmp', 'wb') as f:
     #     f.write(bytes.fromhex('554c424d50031700030001000200ff000000ff000000ff84'))
-    y = Decoder.load_from('./imgs/squares3_no_rle.ulbmp')
-    Encoder(y, 3, depth=4, rle=False).save_to('./file.ulbmp')
-    x = Decoder.load_from('./file.ulbmp')
+    y = Decoder.load_from('./imgs/squares4.ulbmp')
+    Encoder(y, 4, depth=4, rle=False).save_to('./file.ulbmp')
+    # x = Decoder.load_from('./file.ulbmp')
     # Encoder(x, 3, depth=24, rle=False).save_to('file.ulbmp')

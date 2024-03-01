@@ -1,3 +1,10 @@
+"""
+NOM : <Kazberuk>
+PRÉNOM : <Denis>
+SECTION : <INFO>
+MATRICULE : <000589811>
+"""
+
 import sys
 import os
 from encoding import Encoder, Decoder

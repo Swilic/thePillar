@@ -1,4 +1,10 @@
-import sys
+"""
+NOM : <Kazberuk>
+PRÉNOM : <Denis>
+SECTION : <INFO>
+MATRICULE : <000589811>
+"""
+
 from PySide6 import QtWidgets
 
 
@@ -28,20 +34,16 @@ class PopupWindow(QtWidgets.QDialog, QtWidgets.QWidget):
     def add_layout(self):
         layout = QtWidgets.QVBoxLayout()
         layout_ask = QtWidgets.QVBoxLayout()
-        # Checkbox for RLE compression
         layout_ask.addWidget(self.checkbox)
 
-        # ComboBox for version
         layout_combo_version = QtWidgets.QHBoxLayout()
         layout_combo_version.addWidget(self.combobox_version_name)
         layout_combo_version.addWidget(self.combobox_version)
 
-        # ComboBox for depth
         layout_combo_depth = QtWidgets.QHBoxLayout()
         layout_combo_depth.addWidget(self.combobox_depth_name)
         layout_combo_depth.addWidget(self.combobox_depth)
 
-        # Add all layouts to the main layout
         layout_ask.addLayout(layout_combo_version)
         layout_ask.addLayout(layout_combo_depth)
 
@@ -56,16 +58,14 @@ class PopupWindow(QtWidgets.QDialog, QtWidgets.QWidget):
 
     def get_values(self):
         rle = self.checkbox.isChecked()
-        version = int(self.combobox_version.currentText()) if self.combobox_version.currentText().isdigit() else None
-        depth = int(self.combobox_depth.currentText()) if self.combobox_depth.currentText().isdigit() else None
+        try:
+            version = int(self.combobox_version.currentText()) if self.combobox_version.currentText().isdigit() else None
+            depth = int(self.combobox_depth.currentText()) if self.combobox_depth.currentText().isdigit() else None
+        except Exception as e:
+            raise Exception(e)
         return rle, version, depth
 
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication([])
     window = PopupWindow()
-    if window.exec():
-        checkbox_state, combobox_value, int_value = window.get_values()
-        print("Bouton à cocher coché :", checkbox_state, type(checkbox_state))
-        print("Valeur de la liste déroulante :", combobox_value, type(combobox_value))
-        print("Valeur entière entrée :", int_value, type(int_value))

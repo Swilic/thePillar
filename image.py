@@ -1,3 +1,10 @@
+"""
+NOM : <Kazberuk>
+PRÉNOM : <Denis>
+SECTION : <INFO>
+MATRICULE : <000589811>
+"""
+
 from pixel import Pixel
 
 

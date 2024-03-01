@@ -1,3 +1,11 @@
+"""
+NOM : <Kazberuk>
+PRÉNOM : <Denis>
+SECTION : <INFO>
+MATRICULE : <000589811>
+"""
+
+
 def is_valid_color(r: int, g: int, b: int):
     try:
         r = int(r)
