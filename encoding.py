@@ -129,15 +129,34 @@ def save_v3(f, image: 'Image', **kwargs) -> None:
         return save_v3_1to8(f, image, palette, depth, rle)
 
 
+def get_delta(pixel: 'Pixel', pixel2: 'Pixel') -> tuple[int, int, int]:
+    return pixel.color[0] - pixel2.color[0], pixel.color[1] - pixel2.color[1], pixel.color[2] - pixel2.color[2]
+
+
+def write_delta_v4(f, *delta: int) -> None:
+    for i in delta:
+        f.write(i.to_bytes(length=1, byteorder='big', signed=False))
+
+
+def join_pixel_to_byte(diff: int, *delta: int):
+    mi_dr_g = delta[0] >> 4
+    mi_dr_d = delta[0] & 0b1111
+    new = diff + mi_dr_g
+    mi_dgr_g = delta[1] >> 2
+    mi_dgr_d = delta[1] & 0b11
+    new2 = (mi_dr_d << 4) + mi_dgr_g
+    new3 = (mi_dgr_d << 6) + delta[2]
+    return new, new2, new3
+
+
 def save_v4(f, image: 'Image') -> None:
     extension, length_h, width, height = get_header(image, 4)
     f.write(extension + length_h + width + height)
     first_black = Pixel(0, 0, 0)
     pixel_list = [first_black] + image.pixels
+
     for i in range(1, len(pixel_list)):
-        dr = pixel_list[i].color[0] - pixel_list[i - 1].color[0]
-        dg = pixel_list[i].color[1] - pixel_list[i - 1].color[1]
-        db = pixel_list[i].color[2] - pixel_list[i - 1].color[2]
+        dr, dg, db = get_delta(pixel_list[i], pixel_list[i - 1])
         drg = dr - dg
         drb = dr - db
         dgb = dg - db
@@ -159,65 +178,39 @@ def save_v4(f, image: 'Image') -> None:
 
             new1 = 64 + dg
             new2 = (drg << 4) + dbg
-            f.write(new1.to_bytes(length=1, byteorder='big'))
-            f.write(new2.to_bytes(length=1, byteorder='big'))
+            write_delta_v4(f, new1, new2)
 
         elif -128 <= dr <= 127 and -32 <= dgr <= 31 and -32 <= dbr <= 31:
             dr += 128
             dgr += 32
             dbr += 32
 
-            mi_dr_g = dr >> 4
-            mi_dr_d = dr & 0b1111
-            new = 128 + mi_dr_g
-            mi_dgr_g = drg >> 2
-            mi_dgr_d = drg & 0b11
-            new2 = (mi_dr_d << 4) + mi_dgr_g
-            new3 = (mi_dgr_d << 6) + dbr
-            f.write(new.to_bytes(length=1, byteorder='big'))
-            f.write(new2.to_bytes(length=1, byteorder='big'))
-            f.write(new3.to_bytes(length=1, byteorder='big'))
+            new, new2, new3 = join_pixel_to_byte(128, dr, dgr, dbr)
+
+            write_delta_v4(f, new, new2, new3)
+
         elif -128 <= dg <= 127 and -32 <= drg <= 31 and -32 <= dbg <= 31:
             dg += 128
             drg += 32
             dbg += 32
 
-            mi_dg_g = dg >> 4
-            mi_dg_d = dg & 0b1111
-            new1 = 144 + mi_dg_g
-            mi_drg_g = drg >> 2
-            mi_drg_d = drg & 0b11
-            new2 = (mi_dg_d << 4) + mi_drg_g
-            new3 = (mi_drg_d << 6) + dbg
-            f.write(new1.to_bytes(length=1, byteorder='big'))
-            f.write(new2.to_bytes(length=1, byteorder='big'))
-            f.write(new3.to_bytes(length=1, byteorder='big'))
+            new, new2, new3 = join_pixel_to_byte(144, dg, drg, dbg)
+            write_delta_v4(f, new, new2, new3)
 
         elif -128 <= db <= 127 and -32 <= drb <= 31 and -32 <= dgb <= 31:
             db += 128
             drb += 32
             dgb += 32
 
-            mi_db_g = dr >> 4
-            mi_db_d = dr & 0b1111
-            new = 160 + mi_db_g
-            mi_drb_g = drg >> 2
-            mi_drb_d = drg & 0b11
-            new2 = (mi_db_d << 4) + mi_drb_g
-            new3 = (mi_drb_d >> 6) + dgb
-            f.write(new.to_bytes(length=1, byteorder='big'))
-            f.write(new2.to_bytes(length=1, byteorder='big'))
-            f.write(new3.to_bytes(length=1, byteorder='big'))
+            new, new2, new3 = join_pixel_to_byte(160, db, drb, dgb)
+            write_delta_v4(f, new, new2, new3)
 
         else:
             new = 255
             new1 = pixel_list[i].color[0]
             new2 = pixel_list[i].color[1]
             new3 = pixel_list[i].color[2]
-            f.write(new.to_bytes(length=1, byteorder='big'))
-            f.write(new1.to_bytes(length=1, byteorder='big'))
-            f.write(new2.to_bytes(length=1, byteorder='big'))
-            f.write(new3.to_bytes(length=1, byteorder='big'))
+            write_delta_v4(f, new, new1, new2, new3)
 
 
 class Encoder:
