@@ -133,6 +133,36 @@ def get_delta(pixel: 'Pixel', pixel2: 'Pixel') -> tuple[int, int, int]:
     return pixel.color[0] - pixel2.color[0], pixel.color[1] - pixel2.color[1], pixel.color[2] - pixel2.color[2]
 
 
+def add_diff(diff: int, *delta: int) -> tuple[int, int, int]:
+    if diff == 0:
+        return small_diff(*delta)
+    elif diff == 1:
+        return intermediate_diff(*delta)
+    elif diff == 2:
+        return big_diff(*delta)
+
+
+def small_diff(*delta: int) -> tuple[int, int, int]:
+    dr = delta[0] + 2
+    dg = delta[1] + 2
+    db = delta[2] + 2
+    return dr, dg, db
+
+
+def intermediate_diff(*delta: int) -> tuple[int, int, int]:
+    dg = delta[0] + 32
+    drg = delta[1] + 8
+    dbg = delta[2] + 8
+    return dg, drg, dbg
+
+
+def big_diff(*delta: int) -> tuple[int, int, int]:
+    dr = delta[0] + 128
+    dgr = delta[1] + 32
+    dbr = delta[2] + 32
+    return dr, dgr, dbr
+
+
 def write_delta_v4(f, *delta: int) -> None:
     for i in delta:
         f.write(i.to_bytes(length=1, byteorder='big', signed=False))
@@ -164,43 +194,31 @@ def save_v4(f, image: 'Image') -> None:
         dbr = db - dr
         dbg = db - dg
         if -2 <= dr <= 2 and -2 <= dg <= 2 and -2 <= db <= 2:
-            dr += 2
-            dg += 2
-            db += 2
+            dr, dg, db = add_diff(0, dr, dg, db)
 
             new = (dr << 4) + (dg << 2) + db
             f.write(new.to_bytes(length=1, byteorder='big'))
 
         elif -32 <= dg <= 31 and -8 <= drg <= 7 and -8 <= dbg <= 7:
-            dg += 32
-            drg += 8
-            dbg += 8
+            dg, drg, dbg = add_diff(1, dg, drg, dbg)
 
             new1 = 64 + dg
             new2 = (drg << 4) + dbg
             write_delta_v4(f, new1, new2)
 
         elif -128 <= dr <= 127 and -32 <= dgr <= 31 and -32 <= dbr <= 31:
-            dr += 128
-            dgr += 32
-            dbr += 32
-
+            dr, dgr, dbr = add_diff(2, dr, dgr, dbr)
             new, new2, new3 = join_pixel_to_byte(128, dr, dgr, dbr)
 
             write_delta_v4(f, new, new2, new3)
 
         elif -128 <= dg <= 127 and -32 <= drg <= 31 and -32 <= dbg <= 31:
-            dg += 128
-            drg += 32
-            dbg += 32
-
+            dg, drg, dbg = add_diff(2, dg, drg, dbg)
             new, new2, new3 = join_pixel_to_byte(144, dg, drg, dbg)
             write_delta_v4(f, new, new2, new3)
 
         elif -128 <= db <= 127 and -32 <= drb <= 31 and -32 <= dgb <= 31:
-            db += 128
-            drb += 32
-            dgb += 32
+            db, drb, dgb = add_diff(2, db, drb, dgb)
 
             new, new2, new3 = join_pixel_to_byte(160, db, drb, dgb)
             write_delta_v4(f, new, new2, new3)
