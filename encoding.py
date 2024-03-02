@@ -363,7 +363,6 @@ def load_v4(file_list) -> list['Pixel']:
     while i < len(file_list):
         actual = pixel_list[-1]
         actual_r, actual_g, actual_b = actual.color
-        # print(actual_r, actual_g, actual_b)
         did = False
 
         diff = (file_list[i] & 0b10000000) >> 7
@@ -375,11 +374,12 @@ def load_v4(file_list) -> list['Pixel']:
                 r = -2 + ((file_list[i] & 0b00110000) >> 4)
                 g = -2 + ((file_list[i] & 0b00001100) >> 2)
                 b = -2 + (file_list[i] & 0b00000011)
-                # print(actual_r + r, actual_g + g, actual_b + b)
+
                 pixel_list.append(Pixel(actual_r + r, actual_g + g, actual_b + b))
+
             elif diff == 1:
                 # INTERMEDIATE_DIFF
-                dg = -32 + (file_list[i] & 0b0011111)
+                dg = -32 + (file_list[i] & 0b00111111)
                 drg = -8 + ((file_list[i + 1] & 0b11110000) >> 4)
                 dbg = -8 + (file_list[i + 1] & 0b00001111)
                 r = actual_r + dg + drg
@@ -394,24 +394,25 @@ def load_v4(file_list) -> list['Pixel']:
         if not did:
             if diff == 8:
                 # BIG_DIFF_R
-                drg = (-128 + (file_list[i + 1] & 0b00001111)) << 4
-                dr = drg + (file_list[i + 2] & 0b11110000)
-                dgrd = (-32 + (file_list[i + 2] & 0b00001111)) << 2
-                dgr = dgrd + ((file_list[i + 3] & 0b11000000) >> 6)
-                dbr = (-32 + (file_list[i + 3] & 0b00111111))
+                drg = (file_list[i] & 0b00001111) << 4
+                dr = -128 + (drg + ((file_list[i + 1] & 0b11110000) >> 4))
+                dgrd = (file_list[i + 1] & 0b00001111) << 2
+                dgr = -32 + (dgrd + ((file_list[i + 2] & 0b11000000) >> 6))
+                dbr = (-32 + (file_list[i + 2] & 0b00111111))
                 r = actual_r + dr
                 g = actual_g + dr + dgr
                 b = actual_b + dr + dbr
                 pixel_list.append(Pixel(r, g, b))
-                i += 3
+                i += 2
 
             elif diff == 9:
                 # BIG_DIFF_G
                 dgg = (file_list[i] & 0b00001111) << 4
                 dg = -128 + (dgg + ((file_list[i + 1] & 0b11110000) >> 4))
                 dgrd = (file_list[i + 1] & 0b00001111) << 2
-                dgr = -32 + (dgrd + ((file_list[i + 3] & 0b11000000) >> 6))
+                dgr = -32 + (dgrd + ((file_list[i + 2] & 0b11000000) >> 6))
                 dbg = (-32 + (file_list[i + 2] & 0b00111111))
+
                 r = actual_r + dg + dgr
                 g = actual_g + dg
                 b = actual_b + dg + dbg
@@ -420,20 +421,21 @@ def load_v4(file_list) -> list['Pixel']:
 
             elif diff == 10:
                 # BIG_DIFF_B
-                # Celui là est bon
                 dbg = (file_list[i] & 0b00001111) << 4
                 db = -128 + (dbg + ((file_list[i + 1] & 0b11110000) >> 4))
                 drbd = (file_list[i + 1] & 0b00001111) << 2
-                drb = -32 + (drbd + ((file_list[i + 3] & 0b11000000) >> 6))
+                drb = -32 + (drbd + ((file_list[i + 2] & 0b11000000) >> 6))
                 dgb = (-32 + (file_list[i + 2] & 0b00111111))
 
                 r = actual_r + db + drb
                 g = actual_g + db + dgb
                 b = actual_b + db
+
                 pixel_list.append(Pixel(r, g, b))
                 i += 2
 
             elif diff == 15:
+                # NEW_PIXEL
                 r = file_list[i + 1]
                 g = file_list[i + 2]
                 b = file_list[i + 3]
@@ -497,7 +499,7 @@ if __name__ == '__main__':
     # x = Decoder.load_from('./imgs/gradients3_rle.ulbmp')
     # with open('./file.ulbmp', 'wb') as f:
     #     f.write(bytes.fromhex('554c424d50031700030001000200ff000000ff000000ff84'))
-    y = Decoder.load_from('./imgs/squares4.ulbmp')
+    y = Decoder.load_from('./imgs/jelly_beans4.ulbmp')
     Encoder(y, 4, depth=4, rle=False).save_to('./file.ulbmp')
     # x = Decoder.load_from('./file.ulbmp')
     # Encoder(x, 3, depth=24, rle=False).save_to('file.ulbmp')
