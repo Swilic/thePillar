@@ -357,6 +357,40 @@ def load_v3(file_list, **k) -> list['Pixel']:
     return pixel_list
 
 
+def get_color_from_byte_v4(diff: int, file_list, i: int) -> tuple[int, int, int]:
+    if diff == 0:
+        return color_from_small_diff(file_list, i)
+    elif diff == 1:
+        return color_from_intermediate_diff(file_list, i)
+    elif diff == 2:
+        return color_from_big_diff(file_list, i)
+
+
+def color_from_small_diff(file_list, i: int) -> tuple[int, int, int]:
+    r = -2 + ((file_list[i] & 0b00110000) >> 4)
+    g = -2 + ((file_list[i] & 0b00001100) >> 2)
+    b = -2 + (file_list[i] & 0b00000011)
+
+    return r, g, b
+
+
+def color_from_intermediate_diff(file_list, i: int) -> tuple[int, int, int]:
+    dg = -32 + (file_list[i] & 0b00111111)
+    dr = -8 + ((file_list[i + 1] & 0b11110000) >> 4)
+    db = -8 + (file_list[i + 1] & 0b00001111)
+    return dg, dr, db
+
+
+def color_from_big_diff(file_list, i: int) -> tuple[int, int, int]:
+    drg = (file_list[i] & 0b00001111) << 4
+    dr = -128 + (drg + ((file_list[i + 1] & 0b11110000) >> 4))
+    dgrd = (file_list[i + 1] & 0b00001111) << 2
+    dg = -32 + (dgrd + ((file_list[i + 2] & 0b11000000) >> 6))
+    db = (-32 + (file_list[i + 2] & 0b00111111))
+
+    return dr, dg, db
+
+
 def load_v4(file_list) -> list['Pixel']:
     pixel_list = [Pixel(0, 0, 0)]
     i = 0
@@ -371,20 +405,16 @@ def load_v4(file_list) -> list['Pixel']:
 
             if diff == 0:
                 # SMALL_DIFF
-                r = -2 + ((file_list[i] & 0b00110000) >> 4)
-                g = -2 + ((file_list[i] & 0b00001100) >> 2)
-                b = -2 + (file_list[i] & 0b00000011)
+                r, g, b = get_color_from_byte_v4(0, file_list, i)
 
                 pixel_list.append(Pixel(actual_r + r, actual_g + g, actual_b + b))
 
             elif diff == 1:
                 # INTERMEDIATE_DIFF
-                dg = -32 + (file_list[i] & 0b00111111)
-                drg = -8 + ((file_list[i + 1] & 0b11110000) >> 4)
-                dbg = -8 + (file_list[i + 1] & 0b00001111)
-                r = actual_r + dg + drg
+                dg, dr, db = get_color_from_byte_v4(1, file_list, i)
+                r = actual_r + dg + dr
                 g = actual_g + dg
-                b = actual_b + dg + dbg
+                b = actual_b + dg + db
 
                 pixel_list.append(Pixel(r, g, b))
                 i += 1
@@ -394,41 +424,30 @@ def load_v4(file_list) -> list['Pixel']:
         if not did:
             if diff == 8:
                 # BIG_DIFF_R
-                drg = (file_list[i] & 0b00001111) << 4
-                dr = -128 + (drg + ((file_list[i + 1] & 0b11110000) >> 4))
-                dgrd = (file_list[i + 1] & 0b00001111) << 2
-                dgr = -32 + (dgrd + ((file_list[i + 2] & 0b11000000) >> 6))
-                dbr = (-32 + (file_list[i + 2] & 0b00111111))
+                dr, dg, db = get_color_from_byte_v4(2, file_list, i)
+
                 r = actual_r + dr
-                g = actual_g + dr + dgr
-                b = actual_b + dr + dbr
+                g = actual_g + dr + dg
+                b = actual_b + dr + db
                 pixel_list.append(Pixel(r, g, b))
                 i += 2
 
             elif diff == 9:
                 # BIG_DIFF_G
-                dgg = (file_list[i] & 0b00001111) << 4
-                dg = -128 + (dgg + ((file_list[i + 1] & 0b11110000) >> 4))
-                dgrd = (file_list[i + 1] & 0b00001111) << 2
-                dgr = -32 + (dgrd + ((file_list[i + 2] & 0b11000000) >> 6))
-                dbg = (-32 + (file_list[i + 2] & 0b00111111))
+                dg, dr, db = get_color_from_byte_v4(2, file_list, i)
 
-                r = actual_r + dg + dgr
+                r = actual_r + dg + dr
                 g = actual_g + dg
-                b = actual_b + dg + dbg
+                b = actual_b + dg + db
                 pixel_list.append(Pixel(r, g, b))
                 i += 2
 
             elif diff == 10:
                 # BIG_DIFF_B
-                dbg = (file_list[i] & 0b00001111) << 4
-                db = -128 + (dbg + ((file_list[i + 1] & 0b11110000) >> 4))
-                drbd = (file_list[i + 1] & 0b00001111) << 2
-                drb = -32 + (drbd + ((file_list[i + 2] & 0b11000000) >> 6))
-                dgb = (-32 + (file_list[i + 2] & 0b00111111))
+                db, dr, dg = get_color_from_byte_v4(2, file_list, i)
 
-                r = actual_r + db + drb
-                g = actual_g + db + dgb
+                r = actual_r + db + dr
+                g = actual_g + db + dg
                 b = actual_b + db
 
                 pixel_list.append(Pixel(r, g, b))
