@@ -89,7 +89,20 @@ def get_index(palette: set, pixel: 'Pixel') -> int:
 def save_v3_8_rle(f, image, *args):
     palette, depth, rle = args
     write_header_v3(f, image, palette, depth, rle)
-    ...
+    count = 1
+    for i in range(1, len(image)):
+        if image[i - 1] == image[i]:
+            count += 1
+        else:
+            count = 1 if count == 0 else count
+            f.write(count.to_bytes(length=1, byteorder='big', signed=False))
+            f.write(get_index(palette, image[i - 1]).to_bytes(length=1, byteorder='big', signed=False))
+        if count == 255:
+            f.write(count.to_bytes(length=1, byteorder='big', signed=False))
+            f.write(get_index(palette, image[i - 1]).to_bytes(length=1, byteorder='big', signed=False))
+            count = 0
+    f.write(count.to_bytes(length=1, byteorder='big', signed=False))
+    f.write(get_index(palette, image[-1]).to_bytes(length=1, byteorder='big', signed=False))
 
 
 def save_v3_rle(f, image: 'Image', *args):

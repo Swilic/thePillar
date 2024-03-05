@@ -91,7 +91,7 @@ class MyWidget(QtWidgets.QWidget):
         choice = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
 
         if choice:
-            extension = '.ulbmp' if choice[len(choice)-5:] != 'ulbmp' else ''
+            extension = '.ulbmp' if not choice.endswith('.ulbmp') else ''
             Encoder(self.image, version, rle=rle, depth=depth).save_to(choice + extension)
 
 
