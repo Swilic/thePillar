@@ -8,13 +8,15 @@ MATRICULE : <000589811>
 from pixel import Pixel
 
 
-def verify_entries(width: int, height: int, pixels: list[Pixel]) -> int:
+def verify_entries(width: int, height: int, pixels: list[Pixel]) -> bool:
     if width * height != len(pixels):
         raise Exception('Largeur et longueur ne correspondent pas aux nombres de pixels.')
 
     for elem in pixels:
         if not isinstance(elem, Pixel):
             raise Exception('La liste de pixels doit être une classe Pixel')
+
+    return True
 
 
 class Image:

@@ -94,9 +94,9 @@ def save_v3_8_rle(f, image, *args):
         if image[i - 1] == image[i]:
             count += 1
         else:
-            count = 1 if count == 0 else count
             f.write(count.to_bytes(length=1, byteorder='big', signed=False))
             f.write(get_index(palette, image[i - 1]).to_bytes(length=1, byteorder='big', signed=False))
+            count = 1
         if count == 255:
             f.write(count.to_bytes(length=1, byteorder='big', signed=False))
             f.write(get_index(palette, image[i - 1]).to_bytes(length=1, byteorder='big', signed=False))
@@ -355,7 +355,6 @@ def load_v3_rle(file_list, *arg) -> list['Pixel']:
 
 def load_v3(file_list, **k) -> list['Pixel']:
     dic, byts, length = get_header_info_v3(file_list, k['lh'])
-
     pixel_list = []
     if not dic['rle']:
         if dic['depth'] <= 8:
@@ -531,7 +530,7 @@ if __name__ == '__main__':
     # x = Decoder.load_from('./imgs/gradients3_rle.ulbmp')
     # with open('./file.ulbmp', 'wb') as f:
     #     f.write(bytes.fromhex('554c424d50031700030001000200ff000000ff000000ff84'))
-    y = Decoder.load_from('./imgs/jelly_beans4.ulbmp')
-    Encoder(y, 4, depth=4, rle=False).save_to('./file.ulbmp')
-    # x = Decoder.load_from('./file.ulbmp')
+    y = Decoder.load_from('./imgs/checkers3_no_rle.ulbmp')
+    Encoder(y, 3, depth=8, rle=True).save_to('./file.ulbmp')
+    x = Decoder.load_from('./file.ulbmp')
     # Encoder(x, 3, depth=24, rle=False).save_to('file.ulbmp')
