@@ -185,7 +185,7 @@ class Encoder:
         self.__rle = kwargs.get('rle', False)
         self.__image = img
         self.__version = version
-        self.__palette = set(img.pixels)
+        self.__palette = set()
 
     def save_to(self, path: str) -> None:
         case = {
@@ -281,12 +281,8 @@ class Encoder:
     def save_v3_8_rle(self):
         """
         Save the image for the version 3 with depth 8 and rle
-        :param f: file to write
-        :param image: image to write
-        :param args: should contain palette, depth and rle
         :return:
         """
-
         def write(file, c: int, pix: 'Pixel') -> None:
             """
             Write the pixel in the file
@@ -339,6 +335,10 @@ class Encoder:
             self.f.write(to_write[i])
 
     def save_v3(self) -> None:
+        """
+        method that choose the right method to save the image
+        :return:
+        """
         self.__palette = set(self.image)
 
         if self.rle:
@@ -351,6 +351,11 @@ class Encoder:
 
 
 def verify_header(ulbmp: bytes) -> bool:
+    """
+    Verify if the header is valid
+    :param ulbmp:
+    :return:
+    """
     try:
         if ulbmp != b'ULBMP':
             raise Exception('Header ULBMP is not valid')
@@ -361,6 +366,11 @@ def verify_header(ulbmp: bytes) -> bool:
 
 
 def load_basic_rgb(file_list) -> list['Pixel']:
+    """
+    Load basic file with RGB color
+    :param file_list:
+    :return: list of pixels
+    """
     pixel_list = []
     for i in range(0, len(file_list), 3):
         pixel_list.append(Pixel(file_list[i], file_list[i + 1], file_list[i + 2]))
@@ -369,6 +379,11 @@ def load_basic_rgb(file_list) -> list['Pixel']:
 
 
 def load_with_rle(file_list) -> list['Pixel']:
+    """
+    Load image from file with rle
+    :param file_list:
+    :return: list of pixels
+    """
     pixel_list = []
 
     for i in range(0, len(file_list), 4):
@@ -379,6 +394,12 @@ def load_with_rle(file_list) -> list['Pixel']:
 
 
 def set_v3_rle_8(file_list, *dic) -> list['Pixel']:
+    """
+    Set the pixel for the version 3 with rle and depth 8
+    :param file_list: list of pixel from file
+    :param dic:
+    :return: list of pixels
+    """
     dic, byts, length = dic
     pixel_list = []
     for i in range(length - 12, len(file_list), 2):
@@ -390,6 +411,13 @@ def set_v3_rle_8(file_list, *dic) -> list['Pixel']:
 
 
 def set_pixel_v3_no_rle_1to8(file_list, *arg, **k) -> list['Pixel']:
+    """
+    Set the pixel for the version 3 with no rle and depth 1 to 8
+    :param file_list: list of pixel from file
+    :param arg: should contain the dictionary (depth and rle), the list of pixel of the header and the length of the header
+    :param k: should contain the width and the height of the image
+    :return: list of pixels
+    """
     dic, byts, length = arg
     pixel_list = []
     number_decal = 2 ** dic['depth'] - 1
@@ -409,6 +437,12 @@ def set_pixel_v3_no_rle_1to8(file_list, *arg, **k) -> list['Pixel']:
 
 
 def load_v3_rle(file_list, *arg) -> list['Pixel']:
+    """
+    Load the image for the version 3 with rle
+    :param file_list: list of pixel from file
+    :param arg: should contain the dictionary (depth and rle), the list of pixel of the header and the length of the header
+    :return: list of pixels
+    """
     dic, byts, length = arg
 
     if dic['depth'] == 24:
@@ -422,6 +456,12 @@ def load_v3_rle(file_list, *arg) -> list['Pixel']:
 
 
 def load_v3(file_list, **k) -> list['Pixel']:
+    """
+    Load the image for the version 3
+    :param file_list: list of pixel from file
+    :param k: should contain the dictionary (depth and rle), the list of pixel of the header and the length of the header
+    :return: list of pixels
+    """
     dic, byts, length = get_header_info_v3(file_list, k['lh'])
     pixel_list = []
     if not dic['rle']:
@@ -438,6 +478,13 @@ def load_v3(file_list, **k) -> list['Pixel']:
 
 
 def get_color_from_byte_v4(diff: int, file_list, i: int) -> tuple[int, int, int]:
+    """
+    Get the color from the byte for the version 4
+    :param diff: difference of the byte
+    :param file_list: list of pixel from file
+    :param i: index of the byte
+    :return: tuple of color (r, g, b)
+    """
     if diff == 0:
         return color_from_small_diff(file_list, i)
     elif diff == 1:
@@ -447,6 +494,12 @@ def get_color_from_byte_v4(diff: int, file_list, i: int) -> tuple[int, int, int]
 
 
 def color_from_small_diff(file_list, i: int) -> tuple[int, int, int]:
+    """
+    Get the color from the small difference
+    :param file_list: list of pixel from file
+    :param i: index of the byte
+    :return: tuple of color (r, g, b)
+    """
     r = -2 + ((file_list[i] & 0b00110000) >> 4)
     g = -2 + ((file_list[i] & 0b00001100) >> 2)
     b = -2 + (file_list[i] & 0b00000011)
@@ -455,6 +508,12 @@ def color_from_small_diff(file_list, i: int) -> tuple[int, int, int]:
 
 
 def color_from_intermediate_diff(file_list, i: int) -> tuple[int, int, int]:
+    """
+    Get the color from the intermediate difference
+    :param file_list: list of pixel from file
+    :param i: index of the byte
+    :return: tuple of color (r, g, b)
+    """
     dg = -32 + (file_list[i] & 0b00111111)
     dr = -8 + ((file_list[i + 1] & 0b11110000) >> 4)
     db = -8 + (file_list[i + 1] & 0b00001111)
@@ -462,6 +521,12 @@ def color_from_intermediate_diff(file_list, i: int) -> tuple[int, int, int]:
 
 
 def color_from_big_diff(file_list, i: int) -> tuple[int, int, int]:
+    """
+    Get the color from the big difference
+    :param file_list: list of pixel from file
+    :param i: index of the byte
+    :return: tuple of color (r, g, b)
+    """
     drg = (file_list[i] & 0b00001111) << 4
     dr = -128 + (drg + ((file_list[i + 1] & 0b11110000) >> 4))
     dgrd = (file_list[i + 1] & 0b00001111) << 2
@@ -472,6 +537,11 @@ def color_from_big_diff(file_list, i: int) -> tuple[int, int, int]:
 
 
 def load_v4(file_list) -> list['Pixel']:
+    """
+    Load the image for the version 4
+    :param file_list: list of pixel from file
+    :return: list of pixels
+    """
     pixel_list = [Pixel(0, 0, 0)]
     i = 0
     while i < len(file_list):
@@ -546,7 +616,13 @@ def load_v4(file_list) -> list['Pixel']:
 
 
 def get_header_info_v3(f, length: int) -> tuple[dict, list['Pixel'], int]:
-    dic = {'depth': int(f[0]), 'rle': bool(f[1])}
+    """
+    Get the header info for the version 3
+    :param f: file to read
+    :param length: length of the header
+    :return: tuple with the dictionary of depth and rle, list of pixel of the header and the length of the header
+    """
+    dic_depth_rle = {'depth': int(f[0]), 'rle': bool(f[1])}
     list_header_pixel = []
     for i in range(2, length - 14, 3):
         r = f[i]
@@ -554,10 +630,15 @@ def get_header_info_v3(f, length: int) -> tuple[dict, list['Pixel'], int]:
         b = f[i + 2]
         list_header_pixel.append(Pixel(r, g, b))
 
-    return dic, list_header_pixel, length
+    return dic_depth_rle, list_header_pixel, length
 
 
 def get_header_info(f) -> tuple[int, int, int, int]:
+    """
+    Get the header info
+    :param f: file to read
+    :return: tuple with the version, length of the header, width and height
+    """
     ulbmp = f.read(5)
     verify_header(ulbmp)
     version = int.from_bytes(f.read(1), byteorder='little', signed=False)
