@@ -10,13 +10,27 @@ from pixel import Pixel
 
 
 def valid_kwarg(kwarg: dict, version: int) -> bool:
+    """
+    Verify if the kwarg is valid for the version 3
+    :param kwarg: should contain depth and rle
+    :param version: version of the file
+    :return: True if the kwarg is valid or version is not 3
+    """
     if version != 3:
         return True
     if kwarg['depth'] is None or kwarg['rle'] is None:
         raise ValueError('Missing depth or rle')
 
+    return True
+
 
 def get_header(img: 'Image', ver: int) -> tuple[bytes, bytes, bytes, bytes]:
+    """
+    Get the header for all the version
+    :param img: object Image
+    :param ver: version of the image
+    :return: tuple with extension, header length, width and height
+    """
     extension = b'ULBMP' + ver.to_bytes(length=1, byteorder='little', signed=False)
     width = img.width.to_bytes(length=2, byteorder='little', signed=False)
     height = img.height.to_bytes(length=2, byteorder='little', signed=False)
@@ -27,6 +41,13 @@ def get_header(img: 'Image', ver: int) -> tuple[bytes, bytes, bytes, bytes]:
 
 
 def translate_to_byte(palette: set, depth: int, rle: bool) -> list[bytes]:
+    """
+    Translate the palette, depth and rle to bytes
+    :param palette: palette of the image
+    :param depth: depth of the image
+    :param rle: rle of the image
+    :return: byte list with the palette, depth and rle
+    """
     list_info_v3 = [depth.to_bytes(length=1, byteorder='big', signed=False),
                     int(rle).to_bytes(length=1, byteorder='big', signed=False)]
 
@@ -37,109 +58,16 @@ def translate_to_byte(palette: set, depth: int, rle: bool) -> list[bytes]:
     return list_info_v3
 
 
-def write_header_v3(f, image: 'Image', *args):
-    extension, length_h, width, height = get_header(image, 3)
-    palette, depth, rle = args
-    full_length_h = int.from_bytes(length_h, byteorder='little', signed=False) + len(palette) * 3 + 2
-    full_length_h = full_length_h.to_bytes(length=2, byteorder='little', signed=False)
-    to_write = translate_to_byte(palette, depth, rle)
-    f.write(extension + full_length_h + width + height)
-    for i in range(0, len(to_write)):
-        f.write(to_write[i])
-
-
-def save_v1(f, img: 'Image', ver: int = 1) -> None:
-    extension, length_h, width, height = get_header(img, ver)
-    f.write(extension + length_h + width + height)
-
-    for r, g, b in img:
-        f.write(r.to_bytes(length=1, byteorder='big'))
-        f.write(g.to_bytes(length=1, byteorder='big'))
-        f.write(b.to_bytes(length=1, byteorder='big'))
-
-
-def save_v2(f, img: 'Image', ver: int = 2) -> None:
-    def write(file, c: int, pix: 'Pixel'):
-        c = 1 if c == 0 else c
-        file.write(c.to_bytes(length=1, byteorder='big', signed=False))
-        for i in range(3):
-            file.write(pix.color[i].to_bytes(length=1, byteorder='big', signed=False))
-
-    extension, length_h, width, height = get_header(img, ver)
-    f.write(extension + length_h + width + height)
-    count = 1
-    for i in range(1, len(img)):
-        if img[i] == img[i - 1]:
-            count += 1
-        else:
-            write(f, count, img[i - 1])
-            count = 1
-        if count == 255:
-            write(f, 255, img[i - 1])
-            count = 0
-    write(f, count, img[-1])
-
-
 def get_index(palette: set, pixel: 'Pixel') -> int:
+    """
+    Get the index of the pixel in the palette
+    :param palette: palette of the image
+    :param pixel: pixel to find
+    :return: index of the pixel
+    """
     for i, p in enumerate(palette):
         if p == pixel:
             return i
-
-
-def save_v3_8_rle(f, image, *args):
-    palette, depth, rle = args
-    write_header_v3(f, image, palette, depth, rle)
-    count = 1
-    for i in range(1, len(image)):
-        if image[i - 1] == image[i]:
-            count += 1
-        else:
-            f.write(count.to_bytes(length=1, byteorder='big', signed=False))
-            f.write(get_index(palette, image[i - 1]).to_bytes(length=1, byteorder='big', signed=False))
-            count = 1
-        if count == 255:
-            f.write(count.to_bytes(length=1, byteorder='big', signed=False))
-            f.write(get_index(palette, image[i - 1]).to_bytes(length=1, byteorder='big', signed=False))
-            count = 0
-    f.write(count.to_bytes(length=1, byteorder='big', signed=False))
-    f.write(get_index(palette, image[-1]).to_bytes(length=1, byteorder='big', signed=False))
-
-
-def save_v3_rle(f, image: 'Image', *args):
-    palette, depth, rle = args
-    match depth:
-        case 8:
-            return save_v3_8_rle(f, image, palette, depth, rle)
-        case 24:
-            return save_v2(f, image, 3)
-
-
-def save_v3_1to8(f, image: 'Image', *args):
-    palette, depth, rle = args
-    write_header_v3(f, image, palette, depth, rle)
-
-    for i in range(0, len(image), 8 // depth):
-
-        indexs = 0
-        for j in range(8 // depth):
-            if i + j < len(image):
-                index = get_index(palette, image[i + j])
-                indexs += index << (8 - depth * (j + 1))
-
-        f.write(indexs.to_bytes(length=1, byteorder='big', signed=False))
-
-
-def save_v3(f, image: 'Image', **kwargs) -> None:
-    palette = set(image)
-    depth = kwargs['depth']
-    rle = kwargs['rle']
-    if rle:
-        return save_v3_rle(f, image, palette, depth, rle)
-    elif not rle and depth == 24:
-        return save_v1(f, image, 3)
-    elif depth <= 8:
-        # no rle as the definition
-        return save_v3_1to8(f, image, palette, depth, rle)
 
 
 def get_delta(pixel: 'Pixel', pixel2: 'Pixel') -> tuple[int, int, int]:
@@ -177,6 +105,12 @@ def big_diff(*delta: int) -> tuple[int, int, int]:
 
 
 def write_delta_v4(f, *delta: int) -> None:
+    """
+    Write the delta in the file
+    :param f: file to write
+    :param delta: delta to write
+    :return: None
+    """
     for i in delta:
         f.write(i.to_bytes(length=1, byteorder='big', signed=False))
 
@@ -251,19 +185,26 @@ class Encoder:
         self.__rle = kwargs.get('rle', False)
         self.__image = img
         self.__version = version
+        self.__palette = set(img.pixels)
 
     def save_to(self, path: str) -> None:
         case = {
-            1: save_v1,
-            2: save_v2,
-            3: save_v3,
+            1: self.save_v1,
+            2: self.save_v2,
+            3: self.save_v3,
             4: save_v4,
         }
-        with open(path, 'wb') as f:
-            if 1 <= self.version <= 2 or self.version == 4:
-                case[self.version](f, self.image)
-            else:
-                case[self.version](f, self.image, depth=self.depth, rle=self.rle)
+        self.f = open(path, 'wb')
+        if self.version == 1:
+            self.save_v1()
+        elif self.version == 2:
+            self.save_v2()
+        elif self.version == 3:
+            case[self.version]()
+        elif self.version == 4:
+            case[self.version](self.f, self.image)
+
+        self.f.close()
 
     @property
     def image(self) -> 'Image':
@@ -280,6 +221,133 @@ class Encoder:
     @property
     def rle(self) -> bool:
         return self.__rle
+
+    @property
+    def palette(self) -> set['Pixel']:
+        return self.__palette
+
+    def save_v1(self) -> None:
+        """
+        Save the image for the version 1 or 3 with depth 24 and no rle
+        :return: None
+        """
+        extension, length_h, width, height = get_header(self.image, self.version)
+        self.f.write(extension + length_h + width + height)
+
+        for r, g, b in self.image:
+            self.f.write(r.to_bytes(length=1, byteorder='big'))
+            self.f.write(g.to_bytes(length=1, byteorder='big'))
+            self.f.write(b.to_bytes(length=1, byteorder='big'))
+
+    def save_v2(self) -> None:
+        """
+        Save the image for the version 2 or 3 with depth 24 and rle
+        :return: None
+        """
+        def write(file, c: int, pix: 'Pixel') -> None:
+            """
+            Write the pixel in the file
+            :param file: file to write
+            :param c: count of the pixel
+            :param pix: pixel to write
+            :return:
+            """
+            c = 1 if c == 0 else c
+            file.write(c.to_bytes(length=1, byteorder='big', signed=False))
+            for i in range(3):
+                file.write(pix.color[i].to_bytes(length=1, byteorder='big', signed=False))
+
+        extension, length_h, width, height = get_header(self.image, self.version)
+        self.f.write(extension + length_h + width + height)
+        count = 1
+        for i in range(1, len(self.image)):
+            if self.image[i] == self.image[i - 1]:
+                count += 1
+            else:
+                write(self.f, count, self.image[i - 1])
+                count = 1
+            if count == 255:
+                write(self.f, 255, self.image[i - 1])
+                count = 0
+        write(self.f, count, self.image[-1])
+
+    def save_v3_rle(self):
+        match self.depth:
+            case 8:
+                return self.save_v3_8_rle( )
+            case 24:
+                return self.save_v2()
+
+    def save_v3_8_rle(self):
+        """
+        Save the image for the version 3 with depth 8 and rle
+        :param f: file to write
+        :param image: image to write
+        :param args: should contain palette, depth and rle
+        :return:
+        """
+
+        def write(file, c: int, pix: 'Pixel') -> None:
+            """
+            Write the pixel in the file
+            :param file: file to write
+            :param c: count of the pixel
+            :param pix: pixel to write
+            :return: None
+            """
+            c = 1 if c == 0 else c
+            file.write(c.to_bytes(length=1, byteorder='big', signed=False))
+            file.write(get_index(self.palette, pix).to_bytes(length=1, byteorder='big', signed=False))
+
+        self.write_header_v3()
+        count = 1
+        for i in range(1, len(self.image)):
+            if self.image[i - 1] == self.image[i]:
+                count += 1
+            else:
+                write(self.f, count, self.image[i - 1])
+                count = 1
+            if count == 255:
+                write(self.f, 255, self.image[i - 1])
+                count = 0
+        write(self.f, count, self.image[-1])
+
+    def save_v3_1to8(self) -> None:
+        self.write_header_v3()
+
+        for i in range(0, len(self.image), 8 // self.depth):
+
+            indexs = 0
+            for j in range(8 // self.depth):
+                if i + j < len(self.image):
+                    index = get_index(self.palette, self.image[i + j])
+                    indexs += index << (8 - self.depth * (j + 1))
+
+            self.f.write(indexs.to_bytes(length=1, byteorder='big', signed=False))
+
+    def write_header_v3(self) -> None:
+        """
+        Write the header for the version 3
+        :return: None
+        """
+        extension, length_h, width, height = get_header(self.image, 3)
+        full_length_h = int.from_bytes(length_h, byteorder='little', signed=False) + len(self.palette) * 3 + 2
+        full_length_h = full_length_h.to_bytes(length=2, byteorder='little', signed=False)
+        to_write = translate_to_byte(self.palette, self.depth, self.rle)
+        self.f.write(extension + full_length_h + width + height)
+        for i in range(0, len(to_write)):
+            self.f.write(to_write[i])
+
+    def save_v3(self) -> None:
+        self.__palette = set(self.image)
+
+        if self.rle:
+            return self.save_v3_rle()
+        elif not self.rle and self.depth == 24:
+            return self.save_v1()
+        elif self.depth <= 8:
+            # no rle as the definition
+            return self.save_v3_1to8()
 
 
 def verify_header(ulbmp: bytes) -> bool:
