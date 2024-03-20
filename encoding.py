@@ -104,17 +104,6 @@ def big_diff(*delta: int) -> tuple[int, int, int]:
     return dr, dgr, dbr
 
 
-def write_delta_v4(f, *delta: int) -> None:
-    """
-    Write the delta in the file
-    :param f: file to write
-    :param delta: delta to write
-    :return: None
-    """
-    for i in delta:
-        f.write(i.to_bytes(length=1, byteorder='big', signed=False))
-
-
 def join_pixel_to_byte(diff: int, *delta: int):
     mi_dr_g = delta[0] >> 4
     mi_dr_d = delta[0] & 0b1111
@@ -124,58 +113,6 @@ def join_pixel_to_byte(diff: int, *delta: int):
     new2 = (mi_dr_d << 4) + mi_dgr_g
     new3 = (mi_dgr_d << 6) + delta[2]
     return new, new2, new3
-
-
-def save_v4(f, image: 'Image') -> None:
-    extension, length_h, width, height = get_header(image, 4)
-    f.write(extension + length_h + width + height)
-    first_black = Pixel(0, 0, 0)
-    pixel_list = [first_black] + image.pixels
-
-    for i in range(1, len(pixel_list)):
-        dr, dg, db = get_delta(pixel_list[i], pixel_list[i - 1])
-        drg = dr - dg
-        drb = dr - db
-        dgb = dg - db
-        dgr = dg - dr
-        dbr = db - dr
-        dbg = db - dg
-        if -2 <= dr <= 2 and -2 <= dg <= 2 and -2 <= db <= 2:
-            dr, dg, db = add_diff(0, dr, dg, db)
-
-            new = (dr << 4) + (dg << 2) + db
-            f.write(new.to_bytes(length=1, byteorder='big'))
-
-        elif -32 <= dg <= 31 and -8 <= drg <= 7 and -8 <= dbg <= 7:
-            dg, drg, dbg = add_diff(1, dg, drg, dbg)
-
-            new1 = 64 + dg
-            new2 = (drg << 4) + dbg
-            write_delta_v4(f, new1, new2)
-
-        elif -128 <= dr <= 127 and -32 <= dgr <= 31 and -32 <= dbr <= 31:
-            dr, dgr, dbr = add_diff(2, dr, dgr, dbr)
-            new, new2, new3 = join_pixel_to_byte(128, dr, dgr, dbr)
-
-            write_delta_v4(f, new, new2, new3)
-
-        elif -128 <= dg <= 127 and -32 <= drg <= 31 and -32 <= dbg <= 31:
-            dg, drg, dbg = add_diff(2, dg, drg, dbg)
-            new, new2, new3 = join_pixel_to_byte(144, dg, drg, dbg)
-            write_delta_v4(f, new, new2, new3)
-
-        elif -128 <= db <= 127 and -32 <= drb <= 31 and -32 <= dgb <= 31:
-            db, drb, dgb = add_diff(2, db, drb, dgb)
-
-            new, new2, new3 = join_pixel_to_byte(160, db, drb, dgb)
-            write_delta_v4(f, new, new2, new3)
-
-        else:
-            new = 255
-            new1 = pixel_list[i].color[0]
-            new2 = pixel_list[i].color[1]
-            new3 = pixel_list[i].color[2]
-            write_delta_v4(f, new, new1, new2, new3)
 
 
 class Encoder:
@@ -189,20 +126,20 @@ class Encoder:
 
     def save_to(self, path: str) -> None:
         case = {
-            1: self.save_v1,
-            2: self.save_v2,
-            3: self.save_v3,
-            4: save_v4,
+            1: self._save_v1,
+            2: self._save_v2,
+            3: self._save_v3,
+            4: self._save_v4,
         }
         self.f = open(path, 'wb')
         if self.version == 1:
-            self.save_v1()
+            self._save_v1()
         elif self.version == 2:
-            self.save_v2()
+            self._save_v2()
         elif self.version == 3:
             case[self.version]()
         elif self.version == 4:
-            case[self.version](self.f, self.image)
+            case[self.version]()
 
         self.f.close()
 
@@ -226,7 +163,11 @@ class Encoder:
     def palette(self) -> set['Pixel']:
         return self.__palette
 
-    def save_v1(self) -> None:
+    @palette.setter
+    def palette(self, value: set['Pixel']) -> None:
+        self.__palette = value
+
+    def _save_v1(self) -> None:
         """
         Save the image for the version 1 or 3 with depth 24 and no rle
         :return: None
@@ -239,7 +180,7 @@ class Encoder:
             self.f.write(g.to_bytes(length=1, byteorder='big'))
             self.f.write(b.to_bytes(length=1, byteorder='big'))
 
-    def save_v2(self) -> None:
+    def _save_v2(self) -> None:
         """
         Save the image for the version 2 or 3 with depth 24 and rle
         :return: None
@@ -271,14 +212,14 @@ class Encoder:
                 count = 0
         write(self.f, count, self.image[-1])
 
-    def save_v3_rle(self):
+    def _save_v3_rle(self):
         match self.depth:
             case 8:
-                return self.save_v3_8_rle( )
+                return self._save_v3_8_rle()
             case 24:
-                return self.save_v2()
+                return self._save_v2()
 
-    def save_v3_8_rle(self):
+    def _save_v3_8_rle(self):
         """
         Save the image for the version 3 with depth 8 and rle
         :return:
@@ -295,7 +236,7 @@ class Encoder:
             file.write(c.to_bytes(length=1, byteorder='big', signed=False))
             file.write(get_index(self.palette, pix).to_bytes(length=1, byteorder='big', signed=False))
 
-        self.write_header_v3()
+        self._write_header_v3()
         count = 1
         for i in range(1, len(self.image)):
             if self.image[i - 1] == self.image[i]:
@@ -308,8 +249,8 @@ class Encoder:
                 count = 0
         write(self.f, count, self.image[-1])
 
-    def save_v3_1to8(self) -> None:
-        self.write_header_v3()
+    def _save_v3_1to8(self) -> None:
+        self._write_header_v3()
 
         for i in range(0, len(self.image), 8 // self.depth):
 
@@ -321,7 +262,7 @@ class Encoder:
 
             self.f.write(indexs.to_bytes(length=1, byteorder='big', signed=False))
 
-    def write_header_v3(self) -> None:
+    def _write_header_v3(self) -> None:
         """
         Write the header for the version 3
         :return: None
@@ -334,20 +275,87 @@ class Encoder:
         for i in range(0, len(to_write)):
             self.f.write(to_write[i])
 
-    def save_v3(self) -> None:
+    def _save_v3(self) -> None:
         """
         method that choose the right method to save the image
         :return:
         """
-        self.__palette = set(self.image)
+        self.palette = set(self.image)
 
         if self.rle:
-            return self.save_v3_rle()
+            return self._save_v3_rle()
         elif not self.rle and self.depth == 24:
-            return self.save_v1()
+            return self._save_v1()
         elif self.depth <= 8:
             # no rle as the definition
-            return self.save_v3_1to8()
+            return self._save_v3_1to8()
+
+    def _save_v4(self) -> None:
+        # J'sais pas comment améliorer cette fonction.
+        extension, length_h, width, height = get_header(self.image, 4)
+        self.f.write(extension + length_h + width + height)
+        first_black = Pixel(0, 0, 0)
+        pixel_list = [first_black] + self.image.pixels
+
+        for i in range(1, len(pixel_list)):
+            dr, dg, db = get_delta(pixel_list[i], pixel_list[i - 1])
+            drg = dr - dg
+            drb = dr - db
+            dgb = dg - db
+            dgr = dg - dr
+            dbr = db - dr
+            dbg = db - dg
+            if -2 <= dr <= 1 and -2 <= dg <= 1 and -2 <= db <= 1:
+                # small diff
+                dr, dg, db = add_diff(0, dr, dg, db)
+
+                new = (dr << 4) + (dg << 2) + db
+                self.f.write(new.to_bytes(length=1, byteorder='big'))
+
+            elif -32 <= dg <= 31 and -8 <= drg <= 7 and -8 <= dbg <= 7:
+                # intermediate diff
+                dg, drg, dbg = add_diff(1, dg, drg, dbg)
+
+                new1 = 64 + dg
+                new2 = (drg << 4) + dbg
+                self._write_delta_v4(new1, new2)
+
+            elif -128 <= dr <= 127 and -32 <= dgr <= 31 and -32 <= dbr <= 31:
+                # big diff
+                dr, dgr, dbr = add_diff(2, dr, dgr, dbr)
+                new, new2, new3 = join_pixel_to_byte(128, dr, dgr, dbr)
+
+                self._write_delta_v4(new, new2, new3)
+
+            elif -128 <= dg <= 127 and -32 <= drg <= 31 and -32 <= dbg <= 31:
+                # big diff
+                dg, drg, dbg = add_diff(2, dg, drg, dbg)
+                new, new2, new3 = join_pixel_to_byte(144, dg, drg, dbg)
+                self._write_delta_v4(new, new2, new3)
+
+            elif -128 <= db <= 127 and -32 <= drb <= 31 and -32 <= dgb <= 31:
+                # big diff
+                db, drb, dgb = add_diff(2, db, drb, dgb)
+
+                new, new2, new3 = join_pixel_to_byte(160, db, drb, dgb)
+                self._write_delta_v4(new, new2, new3)
+
+            else:
+                # new pixel
+                new = 255
+                new1 = pixel_list[i].color[0]
+                new2 = pixel_list[i].color[1]
+                new3 = pixel_list[i].color[2]
+                self._write_delta_v4(new, new1, new2, new3)
+
+    def _write_delta_v4(self, *delta: int) -> None:
+        """
+        Write the delta in the file
+        :param delta: delta to write
+        :return: None
+        """
+        for i in delta:
+            self.f.write(i.to_bytes(length=1, byteorder='big', signed=False))
 
 
 def verify_header(ulbmp: bytes) -> bool:
@@ -414,7 +422,7 @@ def set_pixel_v3_no_rle_1to8(file_list, *arg, **k) -> list['Pixel']:
     """
     Set the pixel for the version 3 with no rle and depth 1 to 8
     :param file_list: list of pixel from file
-    :param arg: should contain the dictionary (depth and rle), the list of pixel of the header and the length of the header
+    :param arg: should contain the dictionary (depth and rle), pixel of the header and the length of the header
     :param k: should contain the width and the height of the image
     :return: list of pixels
     """
@@ -440,7 +448,7 @@ def load_v3_rle(file_list, *arg) -> list['Pixel']:
     """
     Load the image for the version 3 with rle
     :param file_list: list of pixel from file
-    :param arg: should contain the dictionary (depth and rle), the list of pixel of the header and the length of the header
+    :param arg: should contain the dictionary (depth and rle), pixel of the header and the length of the header
     :return: list of pixels
     """
     dic, byts, length = arg
@@ -459,7 +467,7 @@ def load_v3(file_list, **k) -> list['Pixel']:
     """
     Load the image for the version 3
     :param file_list: list of pixel from file
-    :param k: should contain the dictionary (depth and rle), the list of pixel of the header and the length of the header
+    :param k: should contain the dictionary (depth and rle), pixel of the header and the length of the header
     :return: list of pixels
     """
     dic, byts, length = get_header_info_v3(file_list, k['lh'])
