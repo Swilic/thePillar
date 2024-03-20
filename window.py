@@ -8,7 +8,6 @@ MATRICULE : <000589811>
 import sys
 import os
 from encoding import Encoder, Decoder
-from dialogWindow import PopupWindow
 from PySide6 import QtCore, QtWidgets, QtGui
 
 
@@ -84,15 +83,122 @@ class MyWidget(QtWidgets.QWidget):
         popup = PopupWindow()
         popup.exec()
         rle, version, depth = popup.get_values()
-        if rle and depth < 8:
-            QtWidgets.QErrorMessage(self).showMessage('La profondeur doit être supérieure ou égale à 8 pour le RLE')
-            return
+        # if rle and depth < 8:
+        #     # Normally it's useless. But somehow there is a bug with the popup window
+        #     QtWidgets.QErrorMessage(self).showMessage('La profondeur doit être supérieure ou égale à 8 pour le RLE')
+        #     return
 
         choice = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
 
         if choice:
             extension = '.ulbmp' if not choice.endswith('.ulbmp') else ''
             Encoder(self.image, version, rle=rle, depth=depth).save_to(choice + extension)
+
+
+class PopupWindow(QtWidgets.QDialog, QtWidgets.QWidget):
+    """
+    Class for the popup window, to choose the version and depth of the image
+    """
+    def __init__(self):
+        super().__init__()
+        # ComboBox for version
+        self.__enable_rle = False
+        self.__enable_version = False
+        self.checkbox = QtWidgets.QCheckBox("Compression RLE")
+        self.checkbox.setEnabled(self.enable_rle)
+        self.combobox_version_name = QtWidgets.QLabel("Version")
+        self.combobox_version = QtWidgets.QComboBox()
+        self.combobox_version.addItems(["1", "2", "3", "4"])
+        self.combobox_version.currentTextChanged.connect(self.combo_version_changed)
+
+        # ComboBox for depth
+        self.combobox_depth_name = QtWidgets.QLabel("Profondeur")
+        self.combobox_depth = QtWidgets.QComboBox()
+        self.combobox_depth.addItems(["1", "2", "4", "8", "24"])
+        self.combobox_depth.setEnabled(self.enable_version)
+        self.combobox_depth.currentTextChanged.connect(self.combo_depth_changed)
+
+        self.button_ok = QtWidgets.QPushButton("OK")
+        self.button_cancel = QtWidgets.QPushButton("Annuler")
+
+        self.add_layout()
+
+        self.button_ok.clicked.connect(self.accept)
+        self.button_cancel.clicked.connect(self.reject)
+
+    @property
+    def enable_rle(self):
+        return self.__enable_rle
+
+    @enable_rle.setter
+    def enable_rle(self, value: bool):
+        self.__enable_rle = value
+
+    @property
+    def enable_version(self):
+        return self.__enable_version
+
+    @enable_version.setter
+    def enable_version(self, value: bool):
+        self.__enable_version = value
+
+    def add_layout(self):
+        layout = QtWidgets.QVBoxLayout()
+        layout_ask = QtWidgets.QVBoxLayout()
+        layout_ask.addWidget(self.checkbox)
+
+        layout_combo_version = QtWidgets.QHBoxLayout()
+        layout_combo_version.addWidget(self.combobox_version_name)
+        layout_combo_version.addWidget(self.combobox_version)
+
+        layout_combo_depth = QtWidgets.QHBoxLayout()
+        layout_combo_depth.addWidget(self.combobox_depth_name)
+        layout_combo_depth.addWidget(self.combobox_depth)
+
+        layout_ask.addLayout(layout_combo_version)
+        layout_ask.addLayout(layout_combo_depth)
+
+        layout_valid = QtWidgets.QHBoxLayout()
+        layout_valid.addWidget(self.button_ok)
+        layout_valid.addWidget(self.button_cancel)
+
+        layout.addLayout(layout_ask)
+        layout.addLayout(layout_valid)
+
+        self.setLayout(layout)
+
+    def get_values(self):
+        rle = self.checkbox.isChecked()
+        try:
+            version = int(self.combobox_version.currentText()) if self.combobox_version.currentText().isdigit() else None
+            depth = int(self.combobox_depth.currentText()) if self.combobox_depth.currentText().isdigit() else None
+        except Exception as e:
+            raise Exception(e)
+        return rle, version, depth
+
+    def combo_version_changed(self, text: str):
+        if text == "2":
+            self.enable_rle = True
+            self.checkbox.setEnabled(self.enable_rle)
+        elif text == "4":
+            self.enable_version = True
+            self.combobox_depth.setEnabled(self.enable_version)
+        else:
+            self.enable_rle = False
+            self.enable_version = False
+            self.checkbox.setEnabled(self.enable_rle)
+            self.combobox_depth.setEnabled(self.enable_version)
+
+    def combo_depth_changed(self, text: str):
+        if text == "8":
+            self.enable_rle = True
+            self.checkbox.setEnabled(self.enable_rle)
+        elif text == "24":
+            self.enable_rle = True
+            self.checkbox.setEnabled(self.enable_rle)
+        else:
+            self.enable_rle = False
+            self.checkbox.setEnabled(self.enable_rle)
 
 
 if __name__ == "__main__":
