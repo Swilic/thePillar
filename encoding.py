@@ -75,6 +75,12 @@ def get_delta(pixel: 'Pixel', pixel2: 'Pixel') -> tuple[int, int, int]:
 
 
 def add_diff(diff: int, *delta: int) -> tuple[int, int, int]:
+    """
+    Add the correct diff to the delta
+    :param diff: wich diff to add
+    :param delta: should contain the delta of the pixel
+    :return: tuple with the new delta
+    """
     if diff == 0:
         return small_diff(*delta)
     elif diff == 1:
@@ -84,6 +90,11 @@ def add_diff(diff: int, *delta: int) -> tuple[int, int, int]:
 
 
 def small_diff(*delta: int) -> tuple[int, int, int]:
+    """
+    Add the small diff to the delta
+    :param delta: should contain the delta of the pixel
+    :return: tuple with the new delta
+    """
     dr = delta[0] + 2
     dg = delta[1] + 2
     db = delta[2] + 2
@@ -91,6 +102,10 @@ def small_diff(*delta: int) -> tuple[int, int, int]:
 
 
 def intermediate_diff(*delta: int) -> tuple[int, int, int]:
+    """
+    Add the intermediate diff to the delta
+    :param delta: should contain the delta of the pixel
+    :return: tuple with the new delta"""
     dg = delta[0] + 32
     drg = delta[1] + 8
     dbg = delta[2] + 8
@@ -98,6 +113,11 @@ def intermediate_diff(*delta: int) -> tuple[int, int, int]:
 
 
 def big_diff(*delta: int) -> tuple[int, int, int]:
+    """
+    Add the big diff to the delta
+    :param delta: should contain the delta of the pixel
+    :return: tuple with the new delta
+    """
     dr = delta[0] + 128
     dgr = delta[1] + 32
     dbr = delta[2] + 32
@@ -105,6 +125,12 @@ def big_diff(*delta: int) -> tuple[int, int, int]:
 
 
 def join_pixel_to_byte(diff: int, *delta: int):
+    """
+    Join the pixel to a byte with the correct identification
+    :param diff: the identification of the diff
+    :param delta: should contain the delta of the pixel
+    :return: tuple with the new representation of the pixel
+    """
     mi_dr_g = delta[0] >> 4
     mi_dr_d = delta[0] & 0b1111
     new = diff + mi_dr_g
@@ -132,15 +158,7 @@ class Encoder:
             4: self._save_v4,
         }
         self.f = open(path, 'wb')
-        if self.version == 1:
-            self._save_v1()
-        elif self.version == 2:
-            self._save_v2()
-        elif self.version == 3:
-            case[self.version]()
-        elif self.version == 4:
-            case[self.version]()
-
+        case[self.version]()
         self.f.close()
 
     @property
