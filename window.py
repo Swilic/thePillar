@@ -215,7 +215,7 @@ class PopupWindow(QtWidgets.QDialog, QtWidgets.QWidget):
         if text == "2":
             self.enable_rle = True
             self.checkbox.setEnabled(self.enable_rle)
-        elif text == "4":
+        elif text == "3":
             self.enable_version = True
             self.combobox_depth.setEnabled(self.enable_version)
         else:

@@ -211,7 +211,7 @@ class Encoder:
             :param pix: pixel to write
             :return:
             """
-            c = 1 if c == 0 else c
+
             file.write(c.to_bytes(length=1, byteorder='big', signed=False))
             for i in range(3):
                 file.write(pix.color[i].to_bytes(length=1, byteorder='big', signed=False))
@@ -704,8 +704,8 @@ if __name__ == '__main__':
     image = Image(1, 1, [BLACK])
     # x = Decoder.load_from('./imgs/gradients3_rle.ulbmp')
     # with open('./file.ulbmp', 'wb') as f:
-    #     f.write(bytes.fromhex('554c424d50031700030001000200ff000000ff000000ff84'))
-    y = Decoder.load_from('./imgs/checkers3_no_rle.ulbmp')
-    Encoder(y, 3, depth=8, rle=True).save_to('./file.ulbmp')
+    # f.write(bytes.fromhex('554c424d50031700030001000200ff000000ff000000ff84'))
+    y = Decoder.load_from('./imgs/lines4.ulbmp')
+    Encoder(y, 2, depth=8, rle=True).save_to('./file.ulbmp')
     x = Decoder.load_from('./file.ulbmp')
     # Encoder(x, 3, depth=24, rle=False).save_to('file.ulbmp')
