@@ -12,7 +12,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 
 
 class MyWidget(QtWidgets.QWidget):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle('Projet informatique avec 17(dix-sept)pages de consignes')
         self.is_image = False
@@ -29,7 +29,11 @@ class MyWidget(QtWidgets.QWidget):
     def Qapp() -> QtWidgets.QApplication:
         return QtWidgets.QApplication([])
 
-    def init_UI(self):
+    def init_UI(self) -> None:
+        """
+        Method to intialised the UI of the window
+        :return:
+        """
         self.load_button.clicked.connect(self.load)
         self.save_button.setEnabled(self.is_image)
         self.save_button.clicked.connect(self.save)
@@ -49,7 +53,11 @@ class MyWidget(QtWidgets.QWidget):
         self.show()
         self.set_Pixmap()
 
-    def set_Pixmap(self, ):
+    def set_Pixmap(self) -> None:
+        """
+        Create a pixmax object with the image
+        :return:
+        """
         pix = QtGui.QPixmap(self.Qimage)
         self.label.setPixmap(pix)
         self.label.setMargin(10)
@@ -58,7 +66,11 @@ class MyWidget(QtWidgets.QWidget):
         self.layout.addWidget(self.label)
 
     @QtCore.Slot()
-    def load(self):  # Comment faire si le gars quitte la fenetre, pour arreter la fonction sans break
+    def load(self) -> None:
+        """
+        Method called when the load button is pressed. Open the directory window
+        :return:
+        """
         image_path = QtWidgets.QFileDialog.getOpenFileName(self, 'Open file', os.getcwd(), 'Images (*.ulbmp *.ULBMP)')[0]
         try:
             self.image = Decoder.load_from(image_path)
@@ -68,7 +80,12 @@ class MyWidget(QtWidgets.QWidget):
         self.set_Qimage(self.image)
         self.set_Pixmap()
 
-    def set_Qimage(self, image: 'Image'):
+    def set_Qimage(self, image: 'Image') -> None:
+        """
+        Create an image object with the gived image
+        :param image: the image to load
+        :return:
+        """
         self.Qimage = QtGui.QImage(image.width, image.height, QtGui.QImage.Format_RGB32)
         for i in range(image.width):
             for j in range(image.height):
@@ -79,7 +96,11 @@ class MyWidget(QtWidgets.QWidget):
         self.is_image = True
 
     @QtCore.Slot()
-    def save(self):
+    def save(self) -> None:
+        """
+        Method called when save button pressed. Open antoher window and directory to choose path
+        :return:
+        """
         popup = PopupWindow()
         popup.exec()
         rle, version, depth = popup.get_values()
@@ -99,7 +120,7 @@ class PopupWindow(QtWidgets.QDialog, QtWidgets.QWidget):
     """
     Class for the popup window, to choose the version and depth of the image
     """
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         # ComboBox for version
         self.__enable_rle = False
@@ -127,22 +148,26 @@ class PopupWindow(QtWidgets.QDialog, QtWidgets.QWidget):
         self.button_cancel.clicked.connect(self.reject)
 
     @property
-    def enable_rle(self):
+    def enable_rle(self) -> bool:
         return self.__enable_rle
 
     @enable_rle.setter
-    def enable_rle(self, value: bool):
+    def enable_rle(self, value: bool) -> None:
         self.__enable_rle = value
 
     @property
-    def enable_version(self):
+    def enable_version(self) -> bool:
         return self.__enable_version
 
     @enable_version.setter
-    def enable_version(self, value: bool):
+    def enable_version(self, value: bool) -> None:
         self.__enable_version = value
 
-    def add_layout(self):
+    def add_layout(self) -> None:
+        """
+        All the widget add in the layout
+        :return:
+        """
         layout = QtWidgets.QVBoxLayout()
         layout_ask = QtWidgets.QVBoxLayout()
         layout_ask.addWidget(self.checkbox)
@@ -167,7 +192,11 @@ class PopupWindow(QtWidgets.QDialog, QtWidgets.QWidget):
 
         self.setLayout(layout)
 
-    def get_values(self):
+    def get_values(self) -> tuple[bool, int, int]:
+        """
+        get value from the popu window
+        :return: rle, version and depth
+        """
         rle = self.checkbox.isChecked()
         try:
             version = int(self.combobox_version.currentText()) if self.combobox_version.currentText().isdigit() else None
@@ -176,7 +205,13 @@ class PopupWindow(QtWidgets.QDialog, QtWidgets.QWidget):
             raise Exception(e)
         return rle, version, depth
 
-    def combo_version_changed(self, text: str):
+    def combo_version_changed(self, text: str) -> None:
+        """
+        Called when the version chosen changed.
+        Decide to enbale or disable certain possibility
+        :param text: the version chosen
+        :return:
+        """
         if text == "2":
             self.enable_rle = True
             self.checkbox.setEnabled(self.enable_rle)
@@ -189,7 +224,13 @@ class PopupWindow(QtWidgets.QDialog, QtWidgets.QWidget):
             self.checkbox.setEnabled(self.enable_rle)
             self.combobox_depth.setEnabled(self.enable_version)
 
-    def combo_depth_changed(self, text: str):
+    def combo_depth_changed(self, text: str) -> None:
+        """
+        Called when the depth chosen changed.
+        Decide to enable or disabled certain possibility
+        :param text: the depth chosen
+        :return:
+        """
         if text == "8":
             self.enable_rle = True
             self.checkbox.setEnabled(self.enable_rle)
