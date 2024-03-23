@@ -35,6 +35,8 @@ def get_header(img: 'Image', ver: int) -> tuple[bytes, bytes, bytes, bytes]:
     width = img.width.to_bytes(length=2, byteorder='little', signed=False)
     height = img.height.to_bytes(length=2, byteorder='little', signed=False)
     length_h = len(extension) + len(width) + len(height) + 2
+    if ver == 3:
+        length_h += 2
     length_h = length_h.to_bytes(length=2, byteorder='little', signed=False)
 
     return extension, length_h, width, height
@@ -124,6 +126,16 @@ def big_diff(*delta: int) -> tuple[int, int, int]:
     return dr, dgr, dbr
 
 
+def is_possible_to_convert(length, depth) -> bool:
+    """
+    Verify if it's possible to reduce the depth of the image
+    :param length: length of the palette
+    :param depth: depth wanted
+    :return: True if it's possible
+    """
+    return length <= 2**depth
+
+
 def join_pixel_to_byte(diff: int, *delta: int):
     """
     Join the pixel to a byte with the correct identification
@@ -185,24 +197,22 @@ class Encoder:
     def palette(self, value: set['Pixel']) -> None:
         self.__palette = value
 
-    def _save_v1(self) -> None:
-        """
-        Save the image for the version 1 or 3 with depth 24 and no rle
-        :return: None
-        """
-        extension, length_h, width, height = get_header(self.image, self.version)
-        self.f.write(extension + length_h + width + height)
-
+    def _write_pixels_v1(self) -> None:
         for r, g, b in self.image:
             self.f.write(r.to_bytes(length=1, byteorder='big'))
             self.f.write(g.to_bytes(length=1, byteorder='big'))
             self.f.write(b.to_bytes(length=1, byteorder='big'))
 
-    def _save_v2(self) -> None:
+    def _save_v1(self) -> None:
         """
-        Save the image for the version 2 or 3 with depth 24 and rle
+        Save the image for the version 1
         :return: None
         """
+        extension, length_h, width, height = get_header(self.image, self.version)
+        self.f.write(extension + length_h + width + height)
+        self._write_pixels_v1()
+
+    def _write_pixels_v2(self) -> None:
         def write(file, c: int, pix: 'Pixel') -> None:
             """
             Write the pixel in the file
@@ -211,13 +221,10 @@ class Encoder:
             :param pix: pixel to write
             :return:
             """
-
             file.write(c.to_bytes(length=1, byteorder='big', signed=False))
             for i in range(3):
                 file.write(pix.color[i].to_bytes(length=1, byteorder='big', signed=False))
 
-        extension, length_h, width, height = get_header(self.image, self.version)
-        self.f.write(extension + length_h + width + height)
         count = 1
         for i in range(1, len(self.image)):
             if self.image[i] == self.image[i - 1]:
@@ -230,12 +237,43 @@ class Encoder:
                 count = 0
         write(self.f, count, self.image[-1])
 
+    def _save_v2(self) -> None:
+        """
+        Save the image for the version 2 or 3 with depth 24 and rle
+        :return: None
+        """
+        extension, length_h, width, height = get_header(self.image, self.version)
+        self.f.write(extension + length_h + width + height)
+        self._write_pixels_v2()
+
+    def _save_v3(self) -> None:
+        """
+        method that choose the right method to save the image
+        :return:
+        """
+        self.palette = set(self.image)
+        if not is_possible_to_convert(len(self.palette), self.depth):
+            raise ValueError('Impossible de convertir la palette en profondeur demandée')
+
+        if self.rle and self.depth >= 8:
+            return self._save_v3_rle()
+        elif self.depth == 24:
+            return self._save_v3_24_no_rle()
+        elif self.depth <= 8:
+            # no rle as the definition
+            return self._save_v3_1to8()
+
     def _save_v3_rle(self):
+        """
+        Save the image for the version 3 with rle.
+        :return:
+        """
+        # It doesn't actually save as v3 but v1 or v2, depending on the depth.
         match self.depth:
             case 8:
                 return self._save_v3_8_rle()
             case 24:
-                return self._save_v2()
+                return self._save_v3_24_rle()
 
     def _save_v3_8_rle(self):
         """
@@ -250,7 +288,6 @@ class Encoder:
             :param pix: pixel to write
             :return: None
             """
-            c = 1 if c == 0 else c
             file.write(c.to_bytes(length=1, byteorder='big', signed=False))
             file.write(get_index(self.palette, pix).to_bytes(length=1, byteorder='big', signed=False))
 
@@ -266,6 +303,24 @@ class Encoder:
                 write(self.f, 255, self.image[i - 1])
                 count = 0
         write(self.f, count, self.image[-1])
+
+    def _save_v3_24_rle(self):
+        """
+        Save the image for the version 3 with depth 24
+        :return:
+        """
+        extension, length_h, width, height = get_header(self.image, 3)
+        self.f.write(extension + length_h + width + height + b'\x18\x01')
+        self._write_pixels_v2()
+
+    def _save_v3_24_no_rle(self):
+        """
+        Save the image for the version 3 with depth 24 and no rle
+        :return:
+        """
+        extension, length_h, width, height = get_header(self.image, 3)
+        self.f.write(extension + length_h + width + height + b'\x18\x00')
+        self._write_pixels_v1()
 
     def _save_v3_1to8(self) -> None:
         self._write_header_v3()
@@ -286,27 +341,12 @@ class Encoder:
         :return: None
         """
         extension, length_h, width, height = get_header(self.image, 3)
-        full_length_h = int.from_bytes(length_h, byteorder='little', signed=False) + len(self.palette) * 3 + 2
+        full_length_h = int.from_bytes(length_h, byteorder='little', signed=False) + len(self.palette) * 3
         full_length_h = full_length_h.to_bytes(length=2, byteorder='little', signed=False)
         to_write = translate_to_byte(self.palette, self.depth, self.rle)
         self.f.write(extension + full_length_h + width + height)
         for i in range(0, len(to_write)):
             self.f.write(to_write[i])
-
-    def _save_v3(self) -> None:
-        """
-        method that choose the right method to save the image
-        :return:
-        """
-        self.palette = set(self.image)
-
-        if self.rle:
-            return self._save_v3_rle()
-        elif not self.rle and self.depth == 24:
-            return self._save_v1()
-        elif self.depth <= 8:
-            # no rle as the definition
-            return self._save_v3_1to8()
 
     def _save_v4(self) -> None:
         # J'sais pas comment améliorer cette fonction.
@@ -386,7 +426,7 @@ def verify_header(ulbmp: bytes) -> bool:
         if ulbmp != b'ULBMP':
             raise Exception('Header ULBMP is not valid')
     except Exception as e:
-        raise Exception(e)
+        raise Exception(e, 'Problem with the header')
 
     return True
 
@@ -429,9 +469,11 @@ def set_v3_rle_8(file_list, *dic) -> list['Pixel']:
     dic, byts, length = dic
     pixel_list = []
     for i in range(length - 12, len(file_list), 2):
-        for j in range(file_list[i]):
+        j = 0
+        while j < file_list[i]:
             index = file_list[i + 1]
             pixel_list.append(byts[index].copy())
+            j += 1
 
     return pixel_list
 
@@ -686,14 +728,16 @@ class Decoder:
         }
         with open(path, 'rb') as f:
             try:
+                # print(f.read(20))
                 version, length_header, width, height = get_header_info(f)
             except Exception as e:
-                raise e
+                raise Exception(e, 'Problem with the header')
             file_list = f.read()
 
         if 1 <= version <= 2 or version == 4:
             list_pixel = case[version](file_list)
         else:
+
             list_pixel = case[version](file_list, lh=length_header, width=width, height=height)
         return Image(width, height, list_pixel)
 
@@ -705,7 +749,7 @@ if __name__ == '__main__':
     # x = Decoder.load_from('./imgs/gradients3_rle.ulbmp')
     # with open('./file.ulbmp', 'wb') as f:
     # f.write(bytes.fromhex('554c424d50031700030001000200ff000000ff000000ff84'))
-    y = Decoder.load_from('./imgs/lines4.ulbmp')
-    Encoder(y, 2, depth=8, rle=True).save_to('./file.ulbmp')
+    y = Decoder.load_from('./imgs/lines3_no_rle.ulbmp')
+    Encoder(y, 3, depth=8, rle=True).save_to('./file.ulbmp')
     x = Decoder.load_from('./file.ulbmp')
     # Encoder(x, 3, depth=24, rle=False).save_to('file.ulbmp')

@@ -113,7 +113,10 @@ class MyWidget(QtWidgets.QWidget):
 
         if choice:
             extension = '.ulbmp' if not choice.endswith('.ulbmp') else ''
-            Encoder(self.image, version, rle=rle, depth=depth).save_to(choice + extension)
+            try:
+                Encoder(self.image, version, rle=rle, depth=depth).save_to(choice + extension)
+            except Exception as e:
+                QtWidgets.QErrorMessage(self).showMessage(str(e))
 
 
 class PopupWindow(QtWidgets.QDialog, QtWidgets.QWidget):
@@ -215,6 +218,8 @@ class PopupWindow(QtWidgets.QDialog, QtWidgets.QWidget):
         if text == "2":
             self.enable_rle = True
             self.checkbox.setEnabled(self.enable_rle)
+            self.enable_version = False
+            self.combobox_depth.setEnabled(self.enable_version)
         elif text == "3":
             self.enable_version = True
             self.combobox_depth.setEnabled(self.enable_version)
